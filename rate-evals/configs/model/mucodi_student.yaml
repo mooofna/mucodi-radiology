@@ -1,0 +1,35 @@
+# MuCoDi 3D student trained by main.py.
+# Returns the backbone's pooled d_S output (NOT the projection-head dims).
+#
+# Default: the 4-window chest preset (lung/mediastinum/soft_tissue/bone, in_channels=4).
+# Eval extraction MUST mirror training: in_channels must match the checkpoint's first-conv
+# channel count (4) and the windowing must match training. The eval study overrides model.arch
+# + model.checkpoint_path per rung; in_channels + ct_window_type come from these defaults.
+# (To evaluate an 11-window checkpoint, override model.in_channels=11 model.ct_window_type=all.)
+
+# Path to .pth.tar produced by main.py. Always overridden via Hydra CLI
+# 'model.checkpoint_path=...' to evaluate a specific student's checkpoint.
+checkpoint_path: ???  # MANDATORY: launcher overrides model.checkpoint_path per rung; set explicitly for manual runs
+
+# Student backbone architecture (see models/efficientnet3d.py:_ARCH_REGISTRY).
+# Always overridden via 'model.arch=<key>' to match the checkpoint's backbone.
+arch: "efficientnet3d_b0"
+in_channels: 4
+
+# 4-window chest preset -- MUST match the student's training input
+# (dataprep/datasets.yaml: kd_student_sweep windowing.type). NOT the teacher's
+# 11-window `all` stack: the student is a from-scratch backbone regressing the
+# (frozen) teacher embedding from a cheaper 4-window input.
+ct_window_type: [lung, mediastinum, soft_tissue, bone]
+apply_normalization: false
+
+device: null
+
+# Composition: default loader + preprocess for composed (data-spec) cells.
+default_loader_class: NiftiCTDataset
+preprocess:
+  pipeline: interp
+  target_shape:
+  - 128
+  - 256
+  - 256

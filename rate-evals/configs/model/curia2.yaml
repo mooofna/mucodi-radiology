@@ -1,0 +1,10 @@
+# Curia-2 -- 2D DINOv2 ViT (raidium/curia-2), per-axial-slice + offline mean-pool.
+# Loaded directly from HuggingFace via AutoImageProcessor + AutoModel(trust_remote_code=True).
+
+device: null
+repo_id: "raidium/curia-2"
+
+# Composition: default loader + preprocess for composed (data-spec) cells.
+default_loader_class: NiftiCTDataset
+preprocess:
+  pipeline: passthrough

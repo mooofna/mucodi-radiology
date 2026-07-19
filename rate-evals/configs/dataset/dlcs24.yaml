@@ -1,0 +1,8 @@
+# Duke low-dose lung-cancer screening LDCT (Zenodo NIfTI)
+data:
+  train_json: ${oc.env:REPO_ROOT}/data/evaluation/dlcs24_jsonl/train.jsonl
+  valid_json: ${oc.env:REPO_ROOT}/data/evaluation/dlcs24_jsonl/dev.jsonl
+  test_json: ${oc.env:REPO_ROOT}/data/evaluation/dlcs24_jsonl/test.jsonl
+img_paths_key: nii_path
+modality: chest_ct
+source: nifti

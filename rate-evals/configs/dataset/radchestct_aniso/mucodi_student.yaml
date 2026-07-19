@@ -1,0 +1,16 @@
+loader:
+  class: NiftiCTDataset
+  source: npz
+  npz_key: ct
+  preprocess:
+    pipeline: interp
+    target_shape:
+    - 128
+    - 256
+    - 256
+data:
+  train_json: ${oc.env:REPO_ROOT}/data/radchestct_jsonl/train.jsonl
+  valid_json: ${oc.env:REPO_ROOT}/data/radchestct_jsonl/dev.jsonl
+  test_json: ${oc.env:REPO_ROOT}/data/radchestct_jsonl/test.jsonl
+img_paths_key: npz_path
+modality: chest_ct

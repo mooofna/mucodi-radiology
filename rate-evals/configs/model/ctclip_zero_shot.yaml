@@ -1,0 +1,21 @@
+# CT-CLIP -- frozen-feature teacher (CTViT + BiomedVLP-CXR-BERT); features feed the shared
+# probe head via CTClipZeroShot.extract_features(). Loaded from the upstream
+# `ibrahimethemhamamci/CT-CLIP` clone wired by scripts/setup_external_teachers.sh.
+
+device: null
+
+upstream_dir: ${oc.env:REPO_ROOT}/scripts/external/CT-CLIP
+checkpoint_path: ${oc.env:DATA_ROOT}/radiology/verification/.ctclip_cache/models/CT-CLIP-Related/CT-CLIP_v2.pt
+
+# Composition: default loader + preprocess for composed (data-spec) cells.
+default_loader_class: NiftiCTDataset
+preprocess:
+  pipeline: clip_interp_norm
+  hu_clip:
+  - -1000.0
+  - 1000.0
+  output_norm: halfrange_centered
+  target_shape:
+  - 240
+  - 480
+  - 480

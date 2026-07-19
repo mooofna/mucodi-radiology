@@ -1,0 +1,8 @@
+# LNDb single-centre nodule CT (Zenodo 6613714, MetaImage->NIfTI)
+data:
+  train_json: ${oc.env:REPO_ROOT}/data/evaluation/lndb_jsonl/train.jsonl
+  valid_json: ${oc.env:REPO_ROOT}/data/evaluation/lndb_jsonl/dev.jsonl
+  test_json: ${oc.env:REPO_ROOT}/data/evaluation/lndb_jsonl/test.jsonl
+img_paths_key: nii_path
+modality: chest_ct
+source: nifti

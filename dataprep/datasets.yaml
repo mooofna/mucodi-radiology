@@ -1,0 +1,31 @@
+# CT-RATE V2 knowledge-distillation profile. Consumed by main.py via dataprep/loader.py:
+# one corpus, an npy_mmap pre-resampled .npy cache (built by dataprep/build_npy_resampled_cache.py)
+# with an on-the-fly NIfTI fallback. Windowing and normalization are applied in main.py.
+
+ctrate_kd:
+  description: "CT-RATE V2 KD corpus with joint teachers Pillar-0 (1152-d) and Curia-1 (768-d).
+    Student input is anisotropic 128x256x256 (128 axial slices, 256x256 in-plane): an anisotropic
+    random-resized-crop of the 160x320x320 fp16 pre-resample cache, trilinearly resized to
+    128x256x256, then rendered into a 4-window chest Hounsfield stack. The loader reads per-sample
+    features for both teachers; build_frozen_bank intersects them by sample name."
+  modality: "chest_ct_3d"
+  teacher_dims:
+    pillar0_chest_ct: 1152
+    curia1: 768
+  teacher_order: [pillar0_chest_ct, curia1]
+  target_shape: [128, 256, 256]      # D,H,W: 128 axial slices x 256x256 in-plane
+  pre_crop_shape: null               # RandScaleCrop of the cache, then Resize to target
+  windowing:
+    type: [lung, mediastinum, soft_tissue, bone]
+    per_sample: true
+    modality: "CT"
+  apply_normalization: false
+  aug_strength: "anisotropic_rrc"    # anisotropic random-resized-crop only; no flip/rotation/jitter
+  corpora:
+    ctrate_v2:
+      reader: "npy_mmap"
+      jsonl: "data/ctrate_pretrain_v2_jsonl/train.jsonl"
+      cache_template: "$RUNS_ROOT/kd_student_sweep/_teacher_cache/{teacher}_ctrate_v2_train/embeddings"
+      # 160x320x320 fp16 pre-resample cache (fast mmap reads); built by build_npy_resampled_cache.py.
+      pre_resampled_root: "$DATA_ROOT/radiology/ctrate/npy_160x320x320_f16"
+      weight: 1.0

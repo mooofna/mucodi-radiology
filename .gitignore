@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtualenvs
+/.venv
+.venv/
+
+# Datasets, model weights, caches, run outputs -- never in git.
+# (data/reproducibility/ is the small anchor-verdict ledger; keep it.)
+/data/*
+!/data/reproducibility/
+/data/reproducibility/.scratch/
+/runs
+/logs
+/checkpoints
+/wandb
+/.cache
+experiments/runs
+experiments/studies/*/results/
+*.pt
+*.pth
+*.pth.tar
+*.log
+*.err
+*.out
+
+# Cluster secrets (HF_TOKEN / ZENODO / KAGGLE / REDIVIS). Template: jobs/secrets.env.example
+/jobs/secrets.env
+/jobs/logs/
+
+# Default storage roots when jobs/env.sh is sourced without editing PROJECT_ROOT/SCRATCH_ROOT.
+/.local/
+
+# Vendored upstream clones -- re-fetch via scripts/setup_external_teachers.sh
+/scripts/external/3d-mae-medimaging/
+/scripts/external/CT-CLIP/
+
+# Bundled evaluation package: generated artifacts
+/rate-evals/rate_eval.egg-info/
+/rate-evals/cache/
+/rate-evals/results/
+

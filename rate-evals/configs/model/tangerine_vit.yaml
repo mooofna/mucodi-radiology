@@ -1,0 +1,25 @@
+# TANGERINE-vit -- 3D MAE ViT-Large, CLS head.
+# Loaded via the upstream `niccolo246/3D-MAE-MedImaging` clone wired by
+# scripts/setup_external_teachers.sh.
+
+device: null
+
+# Paths to the upstream clone + Zenodo checkpoint, both staged by setup_external_teachers.sh.
+upstream_dir: ${oc.env:REPO_ROOT}/scripts/external/3d-mae-medimaging
+checkpoint_path: ${oc.env:DATA_ROOT}/radiology/verification/.tangerine_cache/tangerine.pth
+
+# Output is the CLS token (B, 1024); no pooling needed in the wrapper.
+
+# Composition: default loader + preprocess for composed (data-spec) cells.
+default_loader_class: NiftiCTDataset
+preprocess:
+  pipeline: interp_clip_norm
+  hu_clip:
+  - -1200.0
+  - 800.0
+  interpolate_mode: bspline
+  output_norm: minmax
+  target_shape:
+  - 256
+  - 256
+  - 256

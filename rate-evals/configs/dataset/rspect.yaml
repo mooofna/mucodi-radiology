@@ -1,0 +1,7 @@
+data:
+  train_json: ${oc.env:REPO_ROOT}/data/evaluation/rspect_jsonl/train.jsonl
+  valid_json: ${oc.env:REPO_ROOT}/data/evaluation/rspect_jsonl/dev.jsonl
+  test_json: ${oc.env:REPO_ROOT}/data/evaluation/rspect_jsonl/test.jsonl
+img_paths_key: nii_path
+modality: chest_ct
+source: nifti

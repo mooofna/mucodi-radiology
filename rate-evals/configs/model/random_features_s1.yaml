@@ -1,0 +1,23 @@
+# Random-init 3D backbone -- seed-1 twin of random_features.yaml (worst-of-2 floor).
+# Identical in every respect except the backbone-init seed. See random_features.yaml
+# for the full rationale. The benchmark takes the per-cohort MAX over {seed 0, seed 1}
+# as the floor reference, so "every teacher clears the floor" is not decided by a
+# single lucky random init.
+
+arch: "efficientnet3d_b0"
+in_channels: 4
+
+seed: 1
+
+ct_window_type: [lung, mediastinum, soft_tissue, bone]
+apply_normalization: false
+
+device: null
+
+default_loader_class: NiftiCTDataset
+preprocess:
+  pipeline: interp
+  target_shape:
+  - 128
+  - 256
+  - 256

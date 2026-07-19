@@ -1,0 +1,9 @@
+loader:
+  class: NiftiForCTClip
+data:
+  train_json: ${oc.env:REPO_ROOT}/data/evaluation/mosmed_jsonl/train.jsonl
+  valid_json: ${oc.env:REPO_ROOT}/data/evaluation/mosmed_jsonl/dev.jsonl
+  test_json: ${oc.env:REPO_ROOT}/data/evaluation/mosmed_jsonl/test.jsonl
+img_paths_key: nii_path
+modality: chest_ct
+ctclip_upstream_dir: ${oc.env:REPO_ROOT}/scripts/external/CT-CLIP

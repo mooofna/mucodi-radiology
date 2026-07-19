@@ -1,0 +1,9 @@
+# NPZ + flipD_transHW; spacing-aware resample
+loader:
+  class: RADChestCTForPillar0
+data:
+  train_json: ${oc.env:REPO_ROOT}/data/radchestct_jsonl/train.jsonl
+  valid_json: ${oc.env:REPO_ROOT}/data/radchestct_jsonl/dev.jsonl
+  test_json: ${oc.env:REPO_ROOT}/data/radchestct_jsonl/test.jsonl
+img_paths_key: npz_path
+modality: chest_ct

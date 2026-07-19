@@ -1,0 +1,9 @@
+# IPF HRCT; spacing-aware resample
+loader:
+  class: NiftiForPillar0
+data:
+  train_json: ${oc.env:REPO_ROOT}/data/evaluation/osic_jsonl/train.jsonl
+  valid_json: ${oc.env:REPO_ROOT}/data/evaluation/osic_jsonl/dev.jsonl
+  test_json: ${oc.env:REPO_ROOT}/data/evaluation/osic_jsonl/test.jsonl
+img_paths_key: nii_path
+modality: chest_ct

@@ -1,0 +1,32 @@
+# Pillar-0 ChestCT -- uses rate-evals' built-in `Pillar0` class with chest-CT modality.
+# This config wires up the canonical 11-channel multi-window recipe used at training time.
+
+repo_id: "YalaLab/Pillar0-ChestCT"
+revision: "main"
+device: null
+
+# Pooling for two-view inputs (chest CT is single-view here).
+pool_op: "mean"
+per_sample_windowing: true
+apply_normalization: false
+
+# CT windowing: full 11-channel stack (ct_window_type: all), the Pillar-0 input recipe.
+ct_window_type: all
+ct_normalize_mean: 0.289
+ct_normalize_std: 0.198
+
+# Unused for chest CT but the rate-evals Pillar0 class expects them populated.
+xray_normalize_mean: 0.289
+xray_normalize_std: 0.198
+mr_window_type: high_contrast
+mr_normalize_mean: 0.289
+mr_normalize_std: 0.198
+
+# Composition: default loader + preprocess for composed (data-spec) cells.
+default_loader_class: NiftiCTDataset
+preprocess:
+  pipeline: interp
+  target_shape:
+  - 256
+  - 256
+  - 256

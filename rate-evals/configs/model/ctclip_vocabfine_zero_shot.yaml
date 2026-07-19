@@ -1,0 +1,22 @@
+# CT-CLIP-VocabFine -- same CTViT + BiomedVLP-CXR-BERT architecture as base CT-CLIP, but a
+# distinct checkpoint whose visual + text projections were further trained on the 18 CT-RATE
+# abnormalities (present/absent prompt-pair objective). Loaded by CTClipZeroShot
+# (strict=False ignores extra fine-tune-specific keys).
+
+device: null
+
+upstream_dir: ${oc.env:REPO_ROOT}/scripts/external/CT-CLIP
+checkpoint_path: ${oc.env:DATA_ROOT}/radiology/verification/.ctclip_cache/models/CT-CLIP-Related/CT_VocabFine_v2.pt
+
+# Composition: default loader + preprocess for composed (data-spec) cells.
+default_loader_class: NiftiCTDataset
+preprocess:
+  pipeline: clip_interp_norm
+  hu_clip:
+  - -1000.0
+  - 1000.0
+  output_norm: halfrange_centered
+  target_shape:
+  - 240
+  - 480
+  - 480

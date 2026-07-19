@@ -1,0 +1,10 @@
+# Curia-1 -- 2D DINOv2 ViT (raidium/curia, ViT-B 86M), per-axial-slice + offline mean-pool.
+# Same wrapper class as curia2 (parameterized on repo_id).
+
+device: null
+repo_id: "raidium/curia"
+
+# Composition: default loader + preprocess for composed (data-spec) cells.
+default_loader_class: NiftiCTDataset
+preprocess:
+  pipeline: passthrough

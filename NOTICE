@@ -1,0 +1,35 @@
+MuCoDi (radiology) -- third-party attributions
+==============================================
+
+This repository includes and adapts third-party code, each under its own license.
+The original MuCoDi code is licensed under CC BY-NC 4.0 (see LICENSE).
+
+1. MoCo v3
+   The multi-teacher contrastive recipe (moco/loss.py and the MoCo-v3-style
+   training scaffold reused in main.py and utils/) adapts MoCo v3.
+   Copyright (c) Facebook, Inc. and its affiliates.
+   License: Creative Commons Attribution-NonCommercial 4.0 (CC BY-NC 4.0).
+   Source:  https://github.com/facebookresearch/moco-v3
+
+2. MONAI
+   The 3D student backbone (models/efficientnet3d.py) is built on MONAI's
+   EfficientNet implementation.
+   License: Apache License 2.0.
+   Source:  https://github.com/Project-MONAI/MONAI
+
+3. rate_eval (evaluation harness under rate-evals/)
+   A substantially-refactored derivative of YalaLab's RATE-Evals; bundled under its own
+   license. Original (c) Yala Lab; modifications (c) 2026 Maurice Heide.
+   License: Educational Community License 2.0 (see rate-evals/LICENSE).
+   Source:  https://github.com/YalaLab/rate-evals
+
+4. rad-vision-engine / rve
+   HU/MR windowing utilities called at runtime by the rate_eval teacher wrappers; installed
+   as a dependency, not vendored.
+   License: Educational Community License 2.0.
+   Source:  https://github.com/YalaLab/rave
+
+The teacher wrappers under rate-evals/rate_eval/models/ load externally published
+foundation models (CT-CLIP, Curia, Pillar-0, TANGERINE). Those model weights are
+not distributed here; obtain them from their respective providers under their own
+terms.

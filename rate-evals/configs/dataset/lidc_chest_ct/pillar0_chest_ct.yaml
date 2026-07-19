@@ -1,0 +1,9 @@
+# spacing-aware resample; shadows base
+loader:
+  class: NiftiForPillar0
+data:
+  train_json: ${oc.env:REPO_ROOT}/data/evaluation/lidc_chest_ct_jsonl/train.jsonl
+  valid_json: ${oc.env:REPO_ROOT}/data/evaluation/lidc_chest_ct_jsonl/dev.jsonl
+  test_json: ${oc.env:REPO_ROOT}/data/evaluation/lidc_chest_ct_jsonl/test.jsonl
+img_paths_key: nii_path
+modality: chest_ct

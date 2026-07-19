@@ -1,0 +1,66 @@
+"""CV-based evaluation pipeline for frozen radiology FM features."""
+
+from .heads import Linear, MLP, build_head
+from .data import FeatureDataset, load_features_from_cache, load_features_from_cache_split
+from .train import (
+    train_one_fold,
+    train_one_fold_multiclass,
+    predict_proba_multiclass,
+    TrainConfig,
+)
+from .stats import (
+    fold_metrics,
+    aggregate_folds,
+    bootstrap_ci_auroc,
+    bca_ci,
+    paired_bootstrap_diff,
+    holm_correct,
+    bh_fdr_correct,
+    plot_roc_with_bootstrap,
+    plot_pr_with_bootstrap,
+    plot_calibration,
+    sensitivity_at_specificity,
+    multiclass_fold_metrics,
+    multiclass_aggregate_folds,
+    bootstrap_ci_balanced_accuracy,
+    bootstrap_ci_multiclass_auroc,
+    MulticlassCVMetrics,
+    macro_auroc_cluster_ci,
+    paired_macro_auroc_cluster_diff,
+    multiclass_paired_bootstrap_diff,
+    inverse_variance_aggregate,
+)
+from .deploy import deploy_one_class
+
+__all__ = [
+    "Linear",
+    "MLP",
+    "build_head",
+    "FeatureDataset",
+    "load_features_from_cache",
+    "train_one_fold",
+    "train_one_fold_multiclass",
+    "predict_proba_multiclass",
+    "TrainConfig",
+    "fold_metrics",
+    "aggregate_folds",
+    "bootstrap_ci_auroc",
+    "bca_ci",
+    "paired_bootstrap_diff",
+    "holm_correct",
+    "bh_fdr_correct",
+    "plot_roc_with_bootstrap",
+    "plot_pr_with_bootstrap",
+    "plot_calibration",
+    "sensitivity_at_specificity",
+    "multiclass_fold_metrics",
+    "multiclass_aggregate_folds",
+    "bootstrap_ci_balanced_accuracy",
+    "bootstrap_ci_multiclass_auroc",
+    "MulticlassCVMetrics",
+    "macro_auroc_cluster_ci",
+    "paired_macro_auroc_cluster_diff",
+    "multiclass_paired_bootstrap_diff",
+    "inverse_variance_aggregate",
+    "deploy_one_class",
+]

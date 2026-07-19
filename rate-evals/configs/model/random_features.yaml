@@ -1,0 +1,35 @@
+# Random-init 3D backbone -- the architecture-only floor for cross_cohort_benchmark.
+# create_3d_backbone(arch) BEFORE any checkpoint load: a fresh random-init encoder
+# whose pooled d_S features feed the same trained probe as every other model.
+# Isolates what the KD training (contrastive InfoNCE on teacher features) added
+# beyond the raw architectural prior.
+#
+# NO checkpoint_path (RandomFeatures3D never loads weights). arch is overridden per
+# rung via 'model.arch=<key>' (the launcher renders --arch per cell). The input
+# contract mirrors mucodi_student exactly (4-window chest stack, in_channels=4,
+# 256^3) so the floor shares the students' preprocessing.
+#
+# seed = 0 here; random_features_s1.yaml is the seed-1 twin. The benchmark runs
+# both and reports the per-cohort worst case (harder floor to clear).
+
+# Backbone architecture (see models/efficientnet3d.py:_ARCH_REGISTRY); overridden per rung.
+arch: "efficientnet3d_b0"
+in_channels: 4
+
+# Random-init seed for the backbone (reproducible per (arch, seed); stable cache).
+seed: 0
+
+# 4-window chest preset -- MUST match the students' training input.
+ct_window_type: [lung, mediastinum, soft_tissue, bone]
+apply_normalization: false
+
+device: null
+
+# Composition: default loader + preprocess for composed (data-spec) cells.
+default_loader_class: NiftiCTDataset
+preprocess:
+  pipeline: interp
+  target_shape:
+  - 128
+  - 256
+  - 256

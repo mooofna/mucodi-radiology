@@ -1,0 +1,35 @@
+defaults:
+  # Seeds only -- every real invocation overrides via `model=`/`dataset=`.
+  - model: pillar0_chest_ct
+  - dataset: radchestct
+  - _self_
+
+datasets: {}   # resolved from configs/dataset/ by components._get_loader_spec
+
+# Feature-extraction runtime; override per-run via Hydra CLI (e.g. hardware.batch_size_per_gpu=8).
+hardware:
+  device: cuda
+  batch_size_per_gpu: 16
+  num_workers_per_gpu: 8
+
+extraction:
+  max_samples: null      # null = no limit
+  continue_on_error: false
+  check_nan: false
+
+model:
+  dtype: bfloat16
+  device: ${hardware.device}
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+hydra:
+  job:
+    chdir: false
+    name: rate_eval
+  run:
+    dir: logs/runs
+  sweep:
+    dir: logs/multirun

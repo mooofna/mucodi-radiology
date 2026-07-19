@@ -1,0 +1,9 @@
+loader:
+  class: CTRateForTangerine
+data:
+  train_json: ${oc.env:REPO_ROOT}/data/evaluation/ctrate_v2_valid_jsonl/train.jsonl
+  valid_json: ${oc.env:REPO_ROOT}/data/evaluation/ctrate_v2_valid_jsonl/dev.jsonl
+  test_json: ${oc.env:REPO_ROOT}/data/evaluation/ctrate_v2_valid_jsonl/test.jsonl
+img_paths_key: nii_path
+modality: chest_ct
+metadata_csv: ${oc.env:DATA_ROOT}/radiology/ctrate/dataset/metadata/validation_metadata_v2.csv
