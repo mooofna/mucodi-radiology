@@ -9,8 +9,8 @@ embeddings drawn from a full-corpus feature bank, so a lightweight 3D-EfficientN
 student inherits the teachers' representations at a fraction of the parameters.
 
 This is the code for the bachelor thesis *On the Parameter-Performance Trade-Off of
-Radiology Foundation Models* (TU Dresden). It is a fork of the pathology companion
-framework.
+Radiology Foundation Models* (TU Dresden), written at Harvard Medical School and
+Massachusetts General Hospital. It is a fork of the pathology companion framework.
 
 The repository has two coupled parts:
 
@@ -159,4 +159,5 @@ Repository: <https://github.com/mooofna/mucodi-radiology>. Questions and issues:
 use the GitHub issue tracker.
 
 Companion pathology study: Lenz et al., *Multi-Teacher Contrastive Distillation for
-Edge-Efficient Pathology Foundation Models*, 2026 (arXiv:2607.05533, under review).
+Edge-Efficient Pathology Foundation Models*, MICCAI 2026 Workshop on Efficient Medical AI
+(EMA4MICCAI), Best Paper Award. arXiv:2607.05533.
