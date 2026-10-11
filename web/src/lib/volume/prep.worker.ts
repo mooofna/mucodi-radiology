@@ -10,7 +10,12 @@ import { resizeToGrid } from './resample';
 import { applyWindows } from './window';
 import { GRID_SHAPE, gridAffine } from './grid';
 
-export type PrepRequest = { id: number; kind: 'grid' | 'native'; buffer: ArrayBuffer; name: string };
+export type PrepRequest = {
+  id: number;
+  kind: 'grid' | 'native';
+  buffer: ArrayBuffer;
+  name: string;
+};
 
 export interface PrepResult {
   id: number;
@@ -20,7 +25,12 @@ export interface PrepResult {
   gridHu: Float32Array;
   /** World affine of the model grid stored as NIfTI (i, j, k) = (W, H, D). */
   gridAffine: Mat4;
-  native: { shape: [number, number, number]; zooms: [number, number, number]; affine: Mat4; datatype: string } | null;
+  native: {
+    shape: [number, number, number];
+    zooms: [number, number, number];
+    affine: Mat4;
+    datatype: string;
+  } | null;
   stats: { minHu: number; maxHu: number; extentMm: [number, number, number] | null };
   timings: { name: string; ms: number }[];
 }
@@ -53,7 +63,8 @@ async function prepare(req: PrepRequest): Promise<PrepResult> {
   if (req.kind === 'grid') {
     // Stored as NIfTI (W, H, D) with HU x 10 and scl_slope 0.1: its data already is (D, H, W).
     const [W, H, D] = vol.shape;
-    if (D !== GRID_SHAPE[0] || H !== GRID_SHAPE[1] || W !== GRID_SHAPE[2]) throw new Error('not a model-grid file');
+    if (D !== GRID_SHAPE[0] || H !== GRID_SHAPE[1] || W !== GRID_SHAPE[2])
+      throw new Error('not a model-grid file');
     const gridHu = vol.data;
     const input = applyWindows(gridHu);
     lap('Window');
@@ -92,7 +103,12 @@ async function prepare(req: PrepRequest): Promise<PrepResult> {
 
 self.onmessage = (event: MessageEvent<PrepRequest>) => {
   prepare(event.data)
-    .then((r) => (self as unknown as DedicatedWorkerGlobalScope).postMessage(r, [r.input.buffer, r.gridHu.buffer]))
+    .then((r) =>
+      (self as unknown as DedicatedWorkerGlobalScope).postMessage(r, [
+        r.input.buffer,
+        r.gridHu.buffer
+      ])
+    )
     .catch((err: unknown) =>
       (self as unknown as DedicatedWorkerGlobalScope).postMessage({
         id: event.data.id,

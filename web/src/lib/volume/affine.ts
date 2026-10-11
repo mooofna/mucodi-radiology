@@ -28,7 +28,8 @@ export function matmul(a: Mat4, b: Mat4): Mat4 {
 
 export function apply(a: Mat4, p: [number, number, number]): [number, number, number] {
   const out: number[] = [];
-  for (let i = 0; i < 3; i++) out.push(a[i]![0]! * p[0] + a[i]![1]! * p[1] + a[i]![2]! * p[2] + a[i]![3]!);
+  for (let i = 0; i < 3; i++)
+    out.push(a[i]![0]! * p[0] + a[i]![1]! * p[1] + a[i]![2]! * p[2] + a[i]![3]!);
   return [out[0]!, out[1]!, out[2]!];
 }
 
@@ -38,7 +39,8 @@ export function invert(m: Mat4): Mat4 {
   const [a00, a01, a02] = [a[0]![0]!, a[0]![1]!, a[0]![2]!];
   const [a10, a11, a12] = [a[1]![0]!, a[1]![1]!, a[1]![2]!];
   const [a20, a21, a22] = [a[2]![0]!, a[2]![1]!, a[2]![2]!];
-  const det = a00 * (a11 * a22 - a12 * a21) - a01 * (a10 * a22 - a12 * a20) + a02 * (a10 * a21 - a11 * a20);
+  const det =
+    a00 * (a11 * a22 - a12 * a21) - a01 * (a10 * a22 - a12 * a20) + a02 * (a10 * a21 - a11 * a20);
   if (Math.abs(det) < 1e-12) throw new Error('singular affine');
   const r = [
     [(a11 * a22 - a12 * a21) / det, (a02 * a21 - a01 * a22) / det, (a01 * a12 - a02 * a11) / det],
@@ -108,7 +110,10 @@ export function qformAffine(
 }
 
 /** nibabel get_base_affine(): Analyze-style centred affine with the x axis flipped. */
-export function baseAffine(shape: [number, number, number], pixdim: [number, number, number]): Mat4 {
+export function baseAffine(
+  shape: [number, number, number],
+  pixdim: [number, number, number]
+): Mat4 {
   const zooms = [-Math.abs(pixdim[0]), Math.abs(pixdim[1]), Math.abs(pixdim[2])];
   const out = identity();
   for (let i = 0; i < 3; i++) {

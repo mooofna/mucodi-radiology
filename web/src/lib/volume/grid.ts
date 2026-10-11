@@ -25,7 +25,11 @@ export function gridAffine(canonicalAffine: Mat4, canonicalShape: [number, numbe
 }
 
 /** NIfTI dims of the model grid file: (W, H, D). */
-export const GRID_NIFTI_DIMS: [number, number, number] = [GRID_SHAPE[2], GRID_SHAPE[1], GRID_SHAPE[0]];
+export const GRID_NIFTI_DIMS: [number, number, number] = [
+  GRID_SHAPE[2],
+  GRID_SHAPE[1],
+  GRID_SHAPE[0]
+];
 
 /** Voxel size of the model grid in mm as (D, H, W). */
 export function gridSpacing(gridAff: Mat4): [number, number, number] {

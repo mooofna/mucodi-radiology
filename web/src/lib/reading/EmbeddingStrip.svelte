@@ -6,7 +6,12 @@
   const h = 56;
 </script>
 
-<svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label={`Embedding with ${values.length} values`}>
+<svg
+  viewBox={`0 0 ${w} ${h}`}
+  preserveAspectRatio="none"
+  role="img"
+  aria-label={`Embedding with ${values.length} values`}
+>
   <line x1="0" x2={w} y1={h / 2} y2={h / 2} class="zero" />
   {#each Array.from(values) as v, i (i)}
     <rect

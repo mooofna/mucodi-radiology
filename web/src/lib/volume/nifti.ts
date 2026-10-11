@@ -59,7 +59,12 @@ function reader(view: DataView, code: number, little: boolean): (offset: number)
   }
 }
 
-function typedView(buffer: ArrayBuffer, offset: number, n: number, code: number): ArrayLike<number> | null {
+function typedView(
+  buffer: ArrayBuffer,
+  offset: number,
+  n: number,
+  code: number
+): ArrayLike<number> | null {
   switch (code) {
     case 2:
       return new Uint8Array(buffer, offset, n);
@@ -90,7 +95,11 @@ function readSrows(buffer: ArrayBuffer, little: boolean): number[][] {
   for (let r = 0; r < 3; r++) {
     const row: number[] = [];
     for (let c = 0; c < 4; c++) {
-      row.push(isV2 ? view.getFloat64(400 + r * 32 + c * 8, little) : view.getFloat32(280 + r * 16 + c * 4, little));
+      row.push(
+        isV2
+          ? view.getFloat64(400 + r * 32 + c * 8, little)
+          : view.getFloat32(280 + r * 16 + c * 4, little)
+      );
     }
     rows.push(row);
   }
@@ -103,7 +112,8 @@ export async function readNifti(input: ArrayBuffer): Promise<Volume> {
   if (!nifti.isNIFTI(buffer)) throw new NiftiError('not a NIfTI-1 or NIfTI-2 file');
   const hdr = nifti.readHeader(buffer);
   const type = TYPES[hdr.datatypeCode];
-  if (!type) throw new NiftiError(`unsupported NIfTI datatype ${hdr.datatypeCode} (RGB or complex?)`);
+  if (!type)
+    throw new NiftiError(`unsupported NIfTI datatype ${hdr.datatypeCode} (RGB or complex?)`);
 
   const ndim = hdr.dims[0] ?? 0;
   const nx = hdr.dims[1] ?? 1;
@@ -119,7 +129,10 @@ export async function readNifti(input: ArrayBuffer): Promise<Volume> {
   if (offset + n * type.bytes > buffer.byteLength) throw new NiftiError('file is truncated');
   const view = new DataView(buffer, offset, n * type.bytes);
   const read = reader(view, hdr.datatypeCode, hdr.littleEndian);
-  const fast = hdr.littleEndian && offset % type.bytes === 0 ? typedView(buffer, offset, n, hdr.datatypeCode) : null;
+  const fast =
+    hdr.littleEndian && offset % type.bytes === 0
+      ? typedView(buffer, offset, n, hdr.datatypeCode)
+      : null;
 
   // nibabel: slope 0 or non-finite means "no scaling".
   let slope = hdr.scl_slope;
@@ -143,7 +156,11 @@ export async function readNifti(input: ArrayBuffer): Promise<Volume> {
   }
 
   const pix = hdr.pixDims;
-  const zooms: [number, number, number] = [Math.abs(pix[1] ?? 1), Math.abs(pix[2] ?? 1), Math.abs(pix[3] ?? 1)];
+  const zooms: [number, number, number] = [
+    Math.abs(pix[1] ?? 1),
+    Math.abs(pix[2] ?? 1),
+    Math.abs(pix[3] ?? 1)
+  ];
   let affine: Mat4;
   if (hdr.sform_code !== 0) {
     affine = sformAffine(readSrows(buffer, hdr.littleEndian));

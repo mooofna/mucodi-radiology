@@ -65,7 +65,14 @@ export interface Curve {
 export interface CohortCurves {
   cohort: string;
   grid: number;
-  endpoints: Record<string, { n_pos: number; n_neg: number; models: Record<string, Partial<Record<'mlp' | 'linear', Curve>>> }>;
+  endpoints: Record<
+    string,
+    {
+      n_pos: number;
+      n_neg: number;
+      models: Record<string, Partial<Record<'mlp' | 'linear', Curve>>>;
+    }
+  >;
 }
 
 export interface DeployRow {
@@ -78,7 +85,8 @@ export const loadTradeoff = () => getJson<Tradeoff>('evidence/tradeoff.json');
 export const loadCohorts = () => getJson<Cohorts>('evidence/cohorts.json');
 export const loadEndpoints = () => getJson<{ endpoints: Endpoint[] }>('evidence/endpoints.json');
 export const loadDeploy = () => getJson<{ rows: DeployRow[] }>('evidence/deploy.json');
-export const loadCurves = (cohort: string) => getJson<CohortCurves>(`evidence/curves/${cohort}.json`);
+export const loadCurves = (cohort: string) =>
+  getJson<CohortCurves>(`evidence/curves/${cohort}.json`);
 
 /** Model colours from the thesis palette (code/experiments/analysis/style.py); students are ink. */
 export const TEACHER_COLORS: Record<string, string> = {
@@ -91,7 +99,22 @@ export const TEACHER_COLORS: Record<string, string> = {
   'Untrained (B6)': '#888888'
 };
 
-export const STUDENTS = ['TMIN', 'T0', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'B0', 'B2', 'B3', 'B4', 'B5', 'B6'];
+export const STUDENTS = [
+  'TMIN',
+  'T0',
+  'T1',
+  'T2',
+  'T3',
+  'T4',
+  'T5',
+  'T6',
+  'B0',
+  'B2',
+  'B3',
+  'B4',
+  'B5',
+  'B6'
+];
 
 /** Natural frequencies per 1,000 scans at a prevalence, from sensitivity and specificity. */
 export function naturalFrequencies(sens: number, spec: number, prevalence: number, per = 1000) {

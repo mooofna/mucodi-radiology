@@ -25,7 +25,11 @@
   }
 </script>
 
-<button class="toggle" onclick={toggle} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+<button
+  class="toggle"
+  onclick={toggle}
+  aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+>
   {theme === 'dark' ? 'Light' : 'Dark'}
 </button>
 

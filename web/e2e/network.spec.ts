@@ -3,10 +3,16 @@ import { expect, test } from '@playwright/test';
 
 test('network view shows PCA colours and a similarity map', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Encode on this CPU' })).toBeEnabled({ timeout: 60_000 });
+  await expect(page.getByRole('button', { name: 'Encode on this CPU' })).toBeEnabled({
+    timeout: 60_000
+  });
   await page.getByRole('button', { name: 'Compute stage maps' }).click();
-  await expect(page.getByText(/first three principal components/)).toBeVisible({ timeout: 120_000 });
-  console.log((await page.getByText(/first three principal components/).innerText()).replace(/\s+/g, ' '));
+  await expect(page.getByText(/first three principal components/)).toBeVisible({
+    timeout: 120_000
+  });
+  console.log(
+    (await page.getByText(/first three principal components/).innerText()).replace(/\s+/g, ' ')
+  );
   await page.waitForTimeout(1500);
   await page.screenshot({ path: 'test-results/network-pca.png' });
   await page.getByRole('button', { name: '2', exact: true }).click();

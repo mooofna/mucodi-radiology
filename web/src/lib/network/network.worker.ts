@@ -21,11 +21,24 @@ export type NetRequest =
       gridShape: [number, number, number];
     }
   | { id: number; type: 'pca'; key: string; tap: string; basisKey?: string }
-  | { id: number; type: 'similarity'; key: string; tap: string; cell: [number, number, number]; targetKey?: string };
+  | {
+      id: number;
+      type: 'similarity';
+      key: string;
+      tap: string;
+      cell: [number, number, number];
+      targetKey?: string;
+    };
 
 export type NetResponse =
   | { id: number; type: 'stored' }
-  | { id: number; type: 'pca'; rgba: Uint8Array; explained: [number, number, number]; dims: [number, number, number] }
+  | {
+      id: number;
+      type: 'pca';
+      rgba: Uint8Array;
+      explained: [number, number, number];
+      dims: [number, number, number];
+    }
   | {
       id: number;
       type: 'similarity';
@@ -129,7 +142,10 @@ function handle(msg: NetRequest): [NetResponse, Transferable[]] {
       const p = pca3(data, C, N, m);
       const rgba = toRgba(p, N, m, 235);
       const [, D, H, W] = g.shape;
-      return [{ id: msg.id, type: 'pca', rgba, explained: p.explained, dims: [W, H, D] }, [rgba.buffer]];
+      return [
+        { id: msg.id, type: 'pca', rgba, explained: p.explained, dims: [W, H, D] },
+        [rgba.buffer]
+      ];
     }
     case 'similarity': {
       const src = get(msg.key, msg.tap);
@@ -148,7 +164,14 @@ function handle(msg: NetRequest): [NetResponse, Transferable[]] {
       const bh = Math.floor((best % (TH * TW)) / TW);
       const bw = best % TW;
       return [
-        { id: msg.id, type: 'similarity', map, dims: [TW, TH, TD], best: [bd, bh, bw], bestValue: map[best]! },
+        {
+          id: msg.id,
+          type: 'similarity',
+          map,
+          dims: [TW, TH, TD],
+          best: [bd, bh, bw],
+          bestValue: map[best]!
+        },
         [map.buffer]
       ];
     }

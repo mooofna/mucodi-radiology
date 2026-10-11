@@ -23,7 +23,11 @@ function getWorker(): Worker {
   return worker;
 }
 
-export function prepare(kind: PrepRequest['kind'], buffer: ArrayBuffer, name: string): Promise<PrepResult> {
+export function prepare(
+  kind: PrepRequest['kind'],
+  buffer: ArrayBuffer,
+  name: string
+): Promise<PrepResult> {
   const id = nextId++;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });

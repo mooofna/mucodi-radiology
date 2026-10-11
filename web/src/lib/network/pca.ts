@@ -3,7 +3,11 @@
 // explains a prediction.
 
 /** Cyclic Jacobi eigen-decomposition of a symmetric n x n matrix (row-major Float64Array). */
-export function eigSym(a: Float64Array, n: number, sweeps = 30): { values: Float64Array; vectors: Float64Array } {
+export function eigSym(
+  a: Float64Array,
+  n: number,
+  sweeps = 30
+): { values: Float64Array; vectors: Float64Array } {
   const m = Float64Array.from(a);
   const v = new Float64Array(n * n);
   for (let i = 0; i < n; i++) v[i * n + i] = 1;
@@ -106,7 +110,8 @@ export function pca3(data: Float32Array, C: number, N: number, mask: Uint8Array)
         let s = 0;
         const ka = idx[a]!,
           kb = idx[b]!;
-        for (let c = 0; c < C; c++) s += (data[c * N + ka]! - mean[c]!) * (data[c * N + kb]! - mean[c]!);
+        for (let c = 0; c < C; c++)
+          s += (data[c * N + ka]! - mean[c]!) * (data[c * N + kb]! - mean[c]!);
         G[a * M + b] = s;
         G[b * M + a] = s;
       }
@@ -172,7 +177,12 @@ export function toRgba(p: Pca, N: number, mask: Uint8Array, alpha = 255): Uint8A
 }
 
 /** Cosine similarity of every cell's feature vector to a reference vector. */
-export function cosineMap(data: Float32Array, C: number, N: number, ref: Float64Array): Float32Array {
+export function cosineMap(
+  data: Float32Array,
+  C: number,
+  N: number,
+  ref: Float64Array
+): Float32Array {
   let rn = 0;
   for (let c = 0; c < C; c++) rn += ref[c]! ** 2;
   rn = Math.sqrt(rn) || 1;

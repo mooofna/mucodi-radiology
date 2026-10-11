@@ -60,7 +60,11 @@ export function ioOrientation(affine: Mat4): Orientation {
     z = Math.sqrt(z) || 1;
     for (let i = 0; i < 3; i++) rs[i]![j] = affine[i]![j]! / z;
   }
-  const m: number[][] = [0, 1, 2].map((i) => [0, 1, 2].map((j) => rs[0]![i]! * rs[0]![j]! + rs[1]![i]! * rs[1]![j]! + rs[2]![i]! * rs[2]![j]!));
+  const m: number[][] = [0, 1, 2].map((i) =>
+    [0, 1, 2].map(
+      (j) => rs[0]![i]! * rs[0]![j]! + rs[1]![i]! * rs[1]![j]! + rs[2]![i]! * rs[2]![j]!
+    )
+  );
   const { values, vectors } = eigSym3(m);
   const maxVal = Math.max(...values.map(Math.abs));
   const tol = Math.sqrt(maxVal) * 3 * 2.220446049250313e-16;
@@ -72,9 +76,14 @@ export function ioOrientation(affine: Mat4): Orientation {
   for (let k = 0; k < 3; k++) {
     const sv = Math.sqrt(Math.max(values[k]!, 0));
     if (sv <= tol) continue; // rank-deficient direction: dropped, as nibabel's `keep`
-    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) inv[i]![j]! += (vectors[i]![k]! * vectors[j]![k]!) / sv;
+    for (let i = 0; i < 3; i++)
+      for (let j = 0; j < 3; j++) inv[i]![j]! += (vectors[i]![k]! * vectors[j]![k]!) / sv;
   }
-  const R: number[][] = [0, 1, 2].map((i) => [0, 1, 2].map((j) => rs[i]![0]! * inv[0]![j]! + rs[i]![1]! * inv[1]![j]! + rs[i]![2]! * inv[2]![j]!));
+  const R: number[][] = [0, 1, 2].map((i) =>
+    [0, 1, 2].map(
+      (j) => rs[i]![0]! * inv[0]![j]! + rs[i]![1]! * inv[1]![j]! + rs[i]![2]! * inv[2]![j]!
+    )
+  );
 
   // Strongest input axis first (stable on ties), as nibabel 5.4.
   const strength = [0, 1, 2].map((j) => Math.max(...[0, 1, 2].map((i) => R[i]![j]! ** 2)));
@@ -92,7 +101,8 @@ export function ioOrientation(affine: Mat4): Orientation {
     ornt[j] = [out, col[out]! < 0 ? -1 : 1];
     for (let k = 0; k < 3; k++) R[out]![k] = 0;
   }
-  if (ornt.some((r) => Number.isNaN(r[0]))) throw new Error('affine does not determine an orientation');
+  if (ornt.some((r) => Number.isNaN(r[0])))
+    throw new Error('affine does not determine an orientation');
   return ornt as Orientation;
 }
 

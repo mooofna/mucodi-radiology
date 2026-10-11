@@ -1,10 +1,16 @@
 // Minimal NIfTI-1 writer for in-memory overlay volumes (float32 or RGBA32) handed to NiiVue.
 import type { Mat4 } from './affine';
 
-export type NiftiData = { kind: 'float32'; data: Float32Array } | { kind: 'rgba'; data: Uint8Array };
+export type NiftiData =
+  { kind: 'float32'; data: Float32Array } | { kind: 'rgba'; data: Uint8Array };
 
 /** Writes a single-file NIfTI-1 (.nii) with sform and qform code 0/1 set from `affine`. */
-export function writeNifti(dims: [number, number, number], affine: Mat4, payload: NiftiData, scl: { slope: number; inter: number } = { slope: 1, inter: 0 }): ArrayBuffer {
+export function writeNifti(
+  dims: [number, number, number],
+  affine: Mat4,
+  payload: NiftiData,
+  scl: { slope: number; inter: number } = { slope: 1, inter: 0 }
+): ArrayBuffer {
   const voxOffset = 352;
   const bytesPer = payload.kind === 'float32' ? 4 : 4;
   const n = dims[0] * dims[1] * dims[2];
@@ -32,7 +38,8 @@ export function writeNifti(dims: [number, number, number], affine: Mat4, payload
   v.setFloat32(116, scl.inter, le);
   v.setInt16(252, 0, le); // qform_code
   v.setInt16(254, 1, le); // sform_code (scanner)
-  for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) v.setFloat32(280 + r * 16 + c * 4, affine[r]![c]!, le);
+  for (let r = 0; r < 3; r++)
+    for (let c = 0; c < 4; c++) v.setFloat32(280 + r * 16 + c * 4, affine[r]![c]!, le);
   const magic = 'n+1\0';
   for (let i = 0; i < 4; i++) v.setUint8(344 + i, magic.charCodeAt(i));
   if (payload.kind === 'float32') new Float32Array(buf, voxOffset, n).set(payload.data);

@@ -16,16 +16,28 @@
 }`;
 
   const SOFTWARE = [
-    { name: 'ONNX Runtime Web', use: 'runs the students on your CPU (WebAssembly)', licence: 'MIT' },
+    {
+      name: 'ONNX Runtime Web',
+      use: 'runs the students on your CPU (WebAssembly)',
+      licence: 'MIT'
+    },
     { name: 'NiiVue', use: 'slice viewer and volume rendering', licence: 'BSD 2-Clause' },
-    { name: 'dcm2niix', use: 'DICOM to NIfTI conversion, compiled to WebAssembly', licence: 'BSD 2-Clause' },
+    {
+      name: 'dcm2niix',
+      use: 'DICOM to NIfTI conversion, compiled to WebAssembly',
+      licence: 'BSD 2-Clause'
+    },
     { name: 'nifti-reader-js', use: 'NIfTI parsing', licence: 'MIT' },
     { name: 'Observable Plot', use: 'charts', licence: 'ISC' },
     { name: 'Svelte and SvelteKit', use: 'application framework', licence: 'MIT' },
     { name: 'coi-serviceworker', use: 'cross-origin isolation for multithreading', licence: 'MIT' },
     { name: 'IBM Plex Sans and Mono', use: 'typefaces', licence: 'SIL Open Font License 1.1' },
     { name: 'nibabel', use: 'orientation algorithm, ported to TypeScript', licence: 'MIT' },
-    { name: 'rate-evals', use: 'evaluation preprocessing, ported to TypeScript', licence: 'Educational Community License 2.0' }
+    {
+      name: 'rate-evals',
+      use: 'evaluation preprocessing, ported to TypeScript',
+      licence: 'Educational Community License 2.0'
+    }
   ];
 
   let lidcAttribution = $state('');
@@ -70,17 +82,20 @@
     </div>
     <div class="section-body">
       <p>
-        This site is a research demonstration. It is not a medical device, it has not been cleared or approved by any
-        regulator, and it must not be used for diagnosis, treatment or any other clinical decision.
+        This site is a research demonstration. It is not a medical device, it has not been cleared
+        or approved by any regulator, and it must not be used for diagnosis, treatment or any other
+        clinical decision.
       </p>
       <p>
-        The models compute embeddings: vectors that describe a scan. The site turns them into no finding, score or
-        probability. The endpoint results on the evidence page are research evaluations on public cohorts, not the output of
-        a diagnostic test.
+        The models compute embeddings: vectors that describe a scan. The site turns them into no
+        finding, score or probability. The endpoint results on the evidence page are research
+        evaluations on public cohorts, not the output of a diagnostic test.
       </p>
       <p>
-        By using the models you agree to the use restrictions of the <a href={blob('WEIGHTS_LICENSE.md')}>weights licence</a>,
-        which among other things forbid using them to provide medical advice or to make clinical decisions.
+        By using the models you agree to the use restrictions of the <a
+          href={blob('WEIGHTS_LICENSE.md')}>weights licence</a
+        >, which among other things forbid using them to provide medical advice or to make clinical
+        decisions.
       </p>
     </div>
   </section>
@@ -93,24 +108,25 @@
     <div class="section-body">
       <ul class="plain">
         <li>
-          A scan you open is decoded, converted and encoded inside your browser, in background workers. It is never
-          uploaded.
+          A scan you open is decoded, converted and encoded inside your browser, in background
+          workers. It is never uploaded.
         </li>
         <li>
-          No analytics, no cookies and no third-party requests: the fonts, the WebAssembly runtimes and the models are all
-          served from this site.
+          No analytics, no cookies and no third-party requests: the fonts, the WebAssembly runtimes
+          and the models are all served from this site.
         </li>
         <li>
-          Your browser's local storage keeps three settings: the colour theme, the thread setting and your benchmark timings,
-          which the race page uses for the device factor. Clearing the site data removes them.
+          Your browser's local storage keeps three settings: the colour theme, the thread setting
+          and your benchmark timings, which the race page uses for the device factor. Clearing the
+          site data removes them.
         </li>
         <li>
-          Choosing all cores registers a small service worker. It enables cross-origin isolation, which multithreaded
-          WebAssembly requires, and stores nothing.
+          Choosing all cores registers a small service worker. It enables cross-origin isolation,
+          which multithreaded WebAssembly requires, and stores nothing.
         </li>
         <li>
-          The site is hosted on GitHub Pages; GitHub processes visitors' IP addresses in its server logs under its own
-          privacy statement.
+          The site is hosted on GitHub Pages; GitHub processes visitors' IP addresses in its server
+          logs under its own privacy statement.
         </li>
       </ul>
     </div>
@@ -150,17 +166,19 @@
         </tbody>
       </table>
       <p class="small">
-        The students were distilled from Curia-1 (Raidium; Research-Only RAIL-M licence) and Pillar-0 (Yala Lab; Educational
-        Community License 2.0). No teacher weights are distributed. CT-RATE, the training corpus, is not redistributed in any
-        form; the method figure uses panels re-rendered from the LIDC-IDRI case.
+        The students were distilled from Curia-1 (Raidium; Research-Only RAIL-M licence) and
+        Pillar-0 (Yala Lab; Educational Community License 2.0). No teacher weights are distributed.
+        CT-RATE, the training corpus, is not redistributed in any form; the method figure uses
+        panels re-rendered from the LIDC-IDRI case.
       </p>
       {#if lidcAttribution}
         <p class="small">{lidcAttribution}</p>
       {/if}
       <p class="small">
-        Bundled scans: Armato et al., Medical Physics 2011, and the LIDC-IDRI collection (doi:10.7937/K9/TCIA.2015.LO9QL9SX);
-        Tsai et al., Radiology 2021, and the MIDRC-RICORD-1A collection (doi:10.7937/VTW4-X588); both from The Cancer Imaging
-        Archive through the NCI Imaging Data Commons. Full citations and the changes made are listed in DATA_LICENSE.md.
+        Bundled scans: Armato et al., Medical Physics 2011, and the LIDC-IDRI collection
+        (doi:10.7937/K9/TCIA.2015.LO9QL9SX); Tsai et al., Radiology 2021, and the MIDRC-RICORD-1A
+        collection (doi:10.7937/VTW4-X588); both from The Cancer Imaging Archive through the NCI
+        Imaging Data Commons. Full citations and the changes made are listed in DATA_LICENSE.md.
       </p>
       <h3>Software</h3>
       <table class="software">
@@ -180,22 +198,26 @@
     </div>
     <div class="section-body">
       <p>
-        Bachelor's thesis by Maurice Heide, Department of Computer Science, TU Dresden, written in the Clinical Artificial
-        Intelligence group at the Else Kröner Fresenius Center for Digital Health and submitted on 19 July 2026.
+        Bachelor's thesis by Maurice Heide, Department of Computer Science, TU Dresden, written in
+        the Clinical Artificial Intelligence group at the Else Kröner Fresenius Center for Digital
+        Health and submitted on 19 July 2026.
       </p>
       <p>
-        Supervised by Prof. Dr. med. Jakob N. Kather, Prof. Dr. Martin Weigert and Prof. Florian J. Fintelmann, whose
-        Fintelmann Lab at Massachusetts General Hospital and Harvard Medical School hosted the research stay.
+        Supervised by Prof. Dr. med. Jakob N. Kather, Prof. Dr. Martin Weigert and Prof. Florian J.
+        Fintelmann, whose Fintelmann Lab at Massachusetts General Hospital and Harvard Medical
+        School hosted the research stay.
       </p>
       <p>
-        Computational resources: the Athinoula A. Martinos Center at Massachusetts General Hospital and Harvard Medical
-        School, and the Jülich Supercomputing Centre.
+        Computational resources: the Athinoula A. Martinos Center at Massachusetts General Hospital
+        and Harvard Medical School, and the Jülich Supercomputing Centre.
       </p>
       <p>
-        MuCoDi was first developed for computational pathology in a companion study: Lenz, Heide, Gustav, Reitsam and
-        Kather, <i>Multi-Teacher Contrastive Distillation for Edge-Efficient Pathology Foundation Models</i>, arXiv:2607.05533,
-        2026. The teachers are described in Agrawal et al., <i>Pillar-0: A New Frontier for Radiology Foundation Models</i>,
-        arXiv:2511.17803, 2025, and Dancette et al., <i>Curia: A Multi-Modal Foundation Model for Radiology</i>,
+        MuCoDi was first developed for computational pathology in a companion study: Lenz, Heide,
+        Gustav, Reitsam and Kather, <i
+          >Multi-Teacher Contrastive Distillation for Edge-Efficient Pathology Foundation Models</i
+        >, arXiv:2607.05533, 2026. The teachers are described in Agrawal et al.,
+        <i>Pillar-0: A New Frontier for Radiology Foundation Models</i>, arXiv:2511.17803, 2025, and
+        Dancette et al., <i>Curia: A Multi-Modal Foundation Model for Radiology</i>,
         arXiv:2509.06830, 2025.
       </p>
     </div>
@@ -208,9 +230,10 @@
     </div>
     <div class="section-body">
       <p>
-        Prof. Florian J. Fintelmann, who supervised the thesis day to day, is a co-author of Pillar-0, the main teacher.
-        Pillar-0 was chosen by the thesis's cross-cohort benchmark, which scores six radiology foundation models under one
-        frozen-feature protocol and checks each against its published results before ranking them.
+        Prof. Florian J. Fintelmann, who supervised the thesis day to day, is a co-author of
+        Pillar-0, the main teacher. Pillar-0 was chosen by the thesis's cross-cohort benchmark,
+        which scores six radiology foundation models under one frozen-feature protocol and checks
+        each against its published results before ranking them.
       </p>
     </div>
   </section>

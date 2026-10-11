@@ -1,14 +1,23 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { assetUrl } from '#lib/data/manifest.ts';
-  import { loadInference, loadLadder, type Inference, type LadderRung } from '#lib/data/evidence.ts';
+  import {
+    loadInference,
+    loadLadder,
+    type Inference,
+    type LadderRung
+  } from '#lib/data/evidence.ts';
 
   const STEPS = [
     { id: 'full', tab: 'Overview', title: 'The whole pipeline on one page' },
     { id: 'offbox', tab: '(a)', title: 'Both teachers run once, before training' },
     { id: 'pipebox', tab: '(b)', title: 'One volume becomes two crops the teachers never see' },
     { id: 'm1box', tab: '(c)', title: 'One projection head per teacher' },
-    { id: 'objbox', tab: '(d)', title: 'The objective: pull to the positive, push off the negatives' },
+    {
+      id: 'objbox',
+      tab: '(d)',
+      title: 'The objective: pull to the positive, push off the negatives'
+    },
     { id: 'm2box', tab: '(e)', title: 'Two teachers, one sum, no weights to tune' }
   ] as const;
 
@@ -65,15 +74,23 @@
   }
 
   function onTabKey(e: KeyboardEvent) {
-    const keys: Record<string, number> = { ArrowRight: step + 1, ArrowLeft: step - 1, Home: 0, End: STEPS.length - 1 };
+    const keys: Record<string, number> = {
+      ArrowRight: step + 1,
+      ArrowLeft: step - 1,
+      Home: 0,
+      End: STEPS.length - 1
+    };
     if (e.key in keys) {
       e.preventDefault();
       go(keys[e.key]!, true);
     }
   }
 
-  const cpu = (label: string) => inference?.records.find((r) => r.label === label)?.cpu_median_ms ?? null;
-  const teachers = $derived((inference?.records ?? []).filter((r) => r.label === 'Pillar-0' || r.label === 'Curia-1'));
+  const cpu = (label: string) =>
+    inference?.records.find((r) => r.label === label)?.cpu_median_ms ?? null;
+  const teachers = $derived(
+    (inference?.records ?? []).filter((r) => r.label === 'Pillar-0' || r.label === 'Curia-1')
+  );
   const TEACHER_DIM: Record<string, string> = { 'Pillar-0': '1,152', 'Curia-1': '768' };
   const signed = (v: number) => (v < 0 ? `\u2212${-v}` : String(v));
   const fmtNum = (v: number, digits = 0) =>
@@ -90,9 +107,10 @@
     <p class="label">Method</p>
     <h1>Two teachers, fourteen students, one sum.</h1>
     <p class="lede">
-      MuCoDi, multi-teacher contrastive distillation, trains small 3D convolutional encoders to place a chest CT where two
-      frozen radiology foundation models place it. The teachers run once, offline. After training only the student's
-      backbone remains, and that backbone is what this site runs in your browser.
+      MuCoDi, multi-teacher contrastive distillation, trains small 3D convolutional encoders to
+      place a chest CT where two frozen radiology foundation models place it. The teachers run once,
+      offline. After training only the student's backbone remains, and that backbone is what this
+      site runs in your browser.
     </p>
   </header>
 
@@ -123,59 +141,75 @@
           height="682"
         />
         <figcaption class="muted small">
-          Thesis Figure 4.1, compiled from its TikZ source. The scan panels are re-rendered from the bundled LIDC-IDRI case
-          with the thesis's own pipeline code, because the CT-RATE volume of the original may not be republished.
+          Thesis Figure 4.1, compiled from its TikZ source. The scan panels are re-rendered from the
+          bundled LIDC-IDRI case with the thesis's own pipeline code, because the CT-RATE volume of
+          the original may not be republished.
         </figcaption>
       </figure>
       <div class="tour-text">
-        <p class="label">{#if step === 0}Overview{:else}Panel <span class="keep-case">{current.tab}</span>{/if}</p>
+        <p class="label">
+          {#if step === 0}Overview{:else}Panel <span class="keep-case">{current.tab}</span>{/if}
+        </p>
         <h3>{current.title}</h3>
         {#if step === 0}
           <p>
-            Two frozen teachers, Pillar-0 and Curia-1, embed the training corpus once (a). Each training volume becomes two
-            random crops in the four-window form the student reads (b). One linear head per teacher maps the student's
-            embedding into that teacher's space (c, e), a contrastive objective scores it against the teacher's keys (d),
-            and the two losses are summed.
+            Two frozen teachers, Pillar-0 and Curia-1, embed the training corpus once (a). Each
+            training volume becomes two random crops in the four-window form the student reads (b).
+            One linear head per teacher maps the student's embedding into that teacher's space (c,
+            e), a contrastive objective scores it against the teacher's keys (d), and the two losses
+            are summed.
           </p>
-          <p class="muted small">Step through the panels with the tabs above, or with the arrow keys once a tab has focus.</p>
+          <p class="muted small">
+            Step through the panels with the tabs above, or with the arrow keys once a tab has
+            focus.
+          </p>
         {:else if step === 1}
           <ul>
             <li>
-              Each teacher embeds all <span class="num">47,149</span> CT-RATE training volumes once, offline, under its own
-              preprocessing.
+              Each teacher embeds all <span class="num">47,149</span> CT-RATE training volumes once, offline,
+              under its own preprocessing.
             </li>
             <li>
-              The ℓ<sub>2</sub>-normalised embeddings form a feature bank held in GPU memory, so no teacher forward pass
-              happens during training.
+              The ℓ<sub>2</sub>-normalised embeddings form a feature bank held in GPU memory, so no
+              teacher forward pass happens during training.
             </li>
             <li>
               The teachers are frozen, so the stop-gradient is exact. Each query is pushed off
-              <i>M</i> = <span class="num">16,384</span> keys sampled from the bank, where gathering the global batch of
-              <span class="num">32</span> across the four GPUs would supply <span class="num">31</span>.
+              <i>M</i> = <span class="num">16,384</span> keys sampled from the bank, where gathering
+              the global batch of
+              <span class="num">32</span> across the four GPUs would supply
+              <span class="num">31</span>.
             </li>
           </ul>
         {:else if step === 2}
           <ul>
-            <li>Every volume is resampled and cached once at <span class="num">160×320×320</span> in half precision.</li>
             <li>
-              Two anisotropic random crops of the same volume, both resized to <span class="num">128×256×256</span>, and
-              both are the student's. The teachers see neither, which is why the augmentation is crop-only.
+              Every volume is resampled and cached once at <span class="num">160×320×320</span> in half
+              precision.
             </li>
             <li>
-              Each crop becomes the four-window Hounsfield stack the student reads: lung, mediastinum, soft tissue and bone.
+              Two anisotropic random crops of the same volume, both resized to <span class="num"
+                >128×256×256</span
+              >, and both are the student's. The teachers see neither, which is why the augmentation
+              is crop-only.
+            </li>
+            <li>
+              Each crop becomes the four-window Hounsfield stack the student reads: lung,
+              mediastinum, soft tissue and bone.
             </li>
           </ul>
         {:else if step === 3}
           <ul>
             <li>
-              A linear map takes the student's <i>d</i><sub>S</sub>-dimensional embedding into Pillar-0's own
-              <span class="num">1,152</span> dimensions, so the comparison happens where the teacher lives. Panel (e) is its
-              twin for Curia-1 at <span class="num">768</span>.
+              A linear map takes the student's <i>d</i><sub>S</sub>-dimensional embedding into
+              Pillar-0's own
+              <span class="num">1,152</span> dimensions, so the comparison happens where the teacher
+              lives. Panel (e) is its twin for Curia-1 at <span class="num">768</span>.
             </li>
             <li>
-              Linear by design: a bare <i>W</i><sub>t</sub><i>x</i> + <i>b</i><sub>t</sub> leaves the representation work
-              to the backbone, and the head is discarded after distillation. The evaluation's linear probe is chosen later to
-              match it.
+              Linear by design: a bare <i>W</i><sub>t</sub><i>x</i> + <i>b</i><sub>t</sub> leaves the
+              representation work to the backbone, and the head is discarded after distillation. The evaluation's
+              linear probe is chosen later to match it.
             </li>
           </ul>
         {:else if step === 4}
@@ -187,35 +221,54 @@
             <munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>B</mi></munderover>
             <mi>log</mi>
             <mfrac>
-              <msup><mi>e</mi><mrow><msub><mi>s</mi><mrow><mi>i</mi><mi>i</mi></mrow></msub><mo>/</mo><mi>τ</mi></mrow></msup>
+              <msup
+                ><mi>e</mi><mrow
+                  ><msub><mi>s</mi><mrow><mi>i</mi><mi>i</mi></mrow></msub><mo>/</mo><mi>τ</mi
+                  ></mrow
+                ></msup
+              >
               <mrow>
                 <munderover
-                  ><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mrow><mi>B</mi><mo>+</mo><mi>M</mi></mrow></munderover
+                  ><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mrow
+                    ><mi>B</mi><mo>+</mo><mi>M</mi></mrow
+                  ></munderover
                 >
-                <msup><mi>e</mi><mrow><msub><mi>s</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><mo>/</mo><mi>τ</mi></mrow></msup>
+                <msup
+                  ><mi>e</mi><mrow
+                    ><msub><mi>s</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><mo>/</mo><mi>τ</mi
+                    ></mrow
+                  ></msup
+                >
               </mrow>
             </mfrac>
           </math>
           <ul>
             <li>
-              The bank, not the batch: each row scores its positive against <i>B</i> + <i>M</i> = <span class="num">16,392</span> keys,
-              only <i>B</i> = <span class="num">8</span> of them its own.
+              The bank, not the batch: each row scores its positive against <i>B</i> + <i>M</i> =
+              <span class="num">16,392</span>
+              keys, only <i>B</i> = <span class="num">8</span> of them its own.
             </li>
-            <li><i>s</i><sub>ik</sub> scores query <i>i</i> against key <i>k</i>, both ℓ<sub>2</sub>-normalised.</li>
             <li>
-              The 2τ prefactor cancels the 1/τ of the logit scaling, so τ is no longer a hidden learning-rate multiplier;
-              what remains of it sits in the softmax weights. Here τ = <span class="num">0.2</span>.
+              <i>s</i><sub>ik</sub> scores query <i>i</i> against key <i>k</i>, both ℓ<sub>2</sub
+              >-normalised.
+            </li>
+            <li>
+              The 2τ prefactor cancels the 1/τ of the logit scaling, so τ is no longer a hidden
+              learning-rate multiplier; what remains of it sits in the softmax weights. Here τ = <span
+                class="num">0.2</span
+              >.
             </li>
           </ul>
         {:else}
           <ul>
             <li>
-              The two terms combine by a uniform sum, ℒ = ℒ<sub>1</sub> + ℒ<sub>2</sub>, one per teacher, each evaluated
-              on both crops of panel (b). No loss weights, no balancer, nothing fitted per teacher.
+              The two terms combine by a uniform sum, ℒ = ℒ<sub>1</sub> + ℒ<sub>2</sub>, one per
+              teacher, each evaluated on both crops of panel (b). No loss weights, no balancer,
+              nothing fitted per teacher.
             </li>
             <li>
-              Gradients reach the student and its projectors and stop at the keys, which is what makes the bank of panel (a)
-              sound.
+              Gradients reach the student and its projectors and stop at the keys, which is what
+              makes the bank of panel (a) sound.
             </li>
           </ul>
         {/if}
@@ -236,8 +289,9 @@
     </div>
     <div class="section-body">
       <p>
-        Every student is a MONAI 3D EfficientNet scaled by a width and a depth multiplier. The t-line extends the family below
-        B0; the b-line keeps the canonical sizes, with B1 left out to keep the parameter spacing even. The input grid stays at
+        Every student is a MONAI 3D EfficientNet scaled by a width and a depth multiplier. The
+        t-line extends the family below B0; the b-line keeps the canonical sizes, with B1 left out
+        to keep the parameter spacing even. The input grid stays at
         <span class="num">128×256×256</span> for all of them, so parameter count is the only variable.
       </p>
       <div class="scroll">
@@ -289,9 +343,10 @@
         </table>
       </div>
       <p class="muted small">
-        Encoder only: the projection heads are dropped after distillation. FLOPs count one forward pass over the four-window
-        volume at two per multiply-accumulate. CPU time is the median single-request latency on one pinned thread of an Intel
-        Xeon Silver 4214R. Sources: thesis Tables 4.1, 6.5 and A.3.
+        Encoder only: the projection heads are dropped after distillation. FLOPs count one forward
+        pass over the four-window volume at two per multiply-accumulate. CPU time is the median
+        single-request latency on one pinned thread of an Intel Xeon Silver 4214R. Sources: thesis
+        Tables 4.1, 6.5 and A.3.
       </p>
     </div>
   </section>
@@ -304,20 +359,21 @@
     <div class="section-body">
       <ol class="steps">
         <li>
-          <strong>Hounsfield units.</strong> The scan is read as a NIfTI volume with its affine; a DICOM folder is converted
-          first with dcm2niix, compiled to WebAssembly.
+          <strong>Hounsfield units.</strong> The scan is read as a NIfTI volume with its affine; a DICOM
+          folder is converted first with dcm2niix, compiled to WebAssembly.
         </li>
         <li>
-          <strong>Canonical orientation.</strong> The voxel axes are permuted and flipped to the closest canonical orientation,
-          as nibabel does, then ordered as depth, height and width.
+          <strong>Canonical orientation.</strong> The voxel axes are permuted and flipped to the closest
+          canonical orientation, as nibabel does, then ordered as depth, height and width.
         </li>
         <li>
-          <strong>One grid.</strong> The whole field of view is resized to <span class="num">128×256×256</span> with
-          trilinear interpolation, computed as PyTorch computes it.
+          <strong>One grid.</strong> The whole field of view is resized to
+          <span class="num">128×256×256</span> with trilinear interpolation, computed as PyTorch computes
+          it.
         </li>
         <li>
-          <strong>Four windows.</strong> Each window maps its Hounsfield range linearly onto 0 to 1 and clamps outside it,
-          which gives the four input channels.
+          <strong>Four windows.</strong> Each window maps its Hounsfield range linearly onto 0 to 1 and
+          clamps outside it, which gives the four input channels.
         </li>
       </ol>
       <table class="windows">
@@ -335,19 +391,23 @@
               <td>{w.name}</td>
               <td class="num">{signed(w.centre)}</td>
               <td class="num">{w.width}</td>
-              <td class="num">{signed(w.centre - w.width / 2)} to {signed(w.centre + w.width / 2)}</td>
+              <td class="num"
+                >{signed(w.centre - w.width / 2)} to {signed(w.centre + w.width / 2)}</td
+              >
             </tr>
           {/each}
         </tbody>
       </table>
       <p>
-        The browser port follows the thesis's evaluation code step by step. Every encode of a bundled scan is compared live
-        with the embedding the thesis pipeline computes in PyTorch, and the test suite requires a cosine similarity of at
-        least <span class="num">0.9999</span> from the raw scan and from the bundled grid alike. The orientation step is
-        checked against nibabel on all 48 axis permutations and flips, plus oblique affines.
+        The browser port follows the thesis's evaluation code step by step. Every encode of a
+        bundled scan is compared live with the embedding the thesis pipeline computes in PyTorch,
+        and the test suite requires a cosine similarity of at least <span class="num">0.9999</span> from
+        the raw scan and from the bundled grid alike. The orientation step is checked against nibabel
+        on all 48 axis permutations and flips, plus oblique affines.
       </p>
       <p class="muted small">
-        Sources: the rate-evals harness (<span class="mono">readers.py</span>, <span class="mono">preprocess.py</span>,
+        Sources: the rate-evals harness (<span class="mono">readers.py</span>,
+        <span class="mono">preprocess.py</span>,
         <span class="mono">models/common.py</span>) and thesis Table A.1.
       </p>
     </div>
@@ -362,39 +422,45 @@
       <dl class="limits">
         <dt>Training corpus and scope</dt>
         <dd>
-          The students are distilled on one corpus, CT-RATE, acquired at a single Turkish centre, while the teachers were
-          pre-trained on far larger corpora, themselves single-institution. All evaluation is chest CT, and mostly
-          non-contrast: contrast-enhanced CT is probed only by the RSPECT pulmonary angiography cohort. The public cohorts
-          contain no paediatric chest CT, no occupational lung disease, no non-COVID infection, and no cohorts from
-          Sub-Saharan Africa, South America or the Indian subcontinent.
+          The students are distilled on one corpus, CT-RATE, acquired at a single Turkish centre,
+          while the teachers were pre-trained on far larger corpora, themselves single-institution.
+          All evaluation is chest CT, and mostly non-contrast: contrast-enhanced CT is probed only
+          by the RSPECT pulmonary angiography cohort. The public cohorts contain no paediatric chest
+          CT, no occupational lung disease, no non-COVID infection, and no cohorts from Sub-Saharan
+          Africa, South America or the Indian subcontinent.
         </dd>
         <dt>Teacher pool</dt>
         <dd>
-          Every student learns from both teachers. A Pillar-0-only student was not trained, so Curia-1's marginal contribution
-          is untested. Each teacher is read under its own preprocessing, and the effect of harmonising it was not isolated.
+          Every student learns from both teachers. A Pillar-0-only student was not trained, so
+          Curia-1's marginal contribution is untested. Each teacher is read under its own
+          preprocessing, and the effect of harmonising it was not isolated.
         </dd>
         <dt>Student architecture</dt>
         <dd>
-          One backbone family is swept. Vision Transformers, MedNeXt and SwinUNETR were not, so their place on the curve is
-          open. The fixed input grid departs from EfficientNet's compound scaling, which grows resolution together with depth
-          and width.
+          One backbone family is swept. Vision Transformers, MedNeXt and SwinUNETR were not, so
+          their place on the curve is open. The fixed input grid departs from EfficientNet's
+          compound scaling, which grows resolution together with depth and width.
         </dd>
         <dt>Evaluation and read-out</dt>
         <dd>
-          Every result reads frozen features through a probe, so the transfer is probe-dependent by construction, and the MLP
-          probe needs labelled data from each cohort; nothing here is zero-shot. End-to-end fine-tuning, which the frozen
-          read-outs bound from below, was not measured. Each model is a single training run, so the intervals omit seed
-          variance, and the cross-cohort average is a descriptive, unweighted mean without multiplicity correction. The OSIC
-          fibrosis endpoint sits at chance for every model.
+          Every result reads frozen features through a probe, so the transfer is probe-dependent by
+          construction, and the MLP probe needs labelled data from each cohort; nothing here is
+          zero-shot. End-to-end fine-tuning, which the frozen read-outs bound from below, was not
+          measured. Each model is a single training run, so the intervals omit seed variance, and
+          the cross-cohort average is a descriptive, unweighted mean without multiplicity
+          correction. The OSIC fibrosis endpoint sits at chance for every model.
         </dd>
         <dt>Inference benchmark</dt>
         <dd>
-          Latency was measured at two operating points: one single-threaded Xeon core and one A100 GPU. Multi-threaded CPUs,
-          consumer GPUs, true edge devices and energy per inference were not measured. This demo adds a third point, your own
-          CPU, under browser conditions; its teacher lanes are projections through a measured device factor, not runs.
+          Latency was measured at two operating points: one single-threaded Xeon core and one A100
+          GPU. Multi-threaded CPUs, consumer GPUs, true edge devices and energy per inference were
+          not measured. This demo adds a third point, your own CPU, under browser conditions; its
+          teacher lanes are projections through a measured device factor, not runs.
         </dd>
       </dl>
-      <p class="muted small">Source: thesis Section 7.5. The last sentence describes this demo, not the thesis.</p>
+      <p class="muted small">
+        Source: thesis Section 7.5. The last sentence describes this demo, not the thesis.
+      </p>
     </div>
   </section>
 
@@ -405,19 +471,22 @@
     </div>
     <div class="section-body">
       <p>
-        The parameter-performance trade-off is probe-dependent. Under the linear probe, external transfer climbs with capacity
-        and reaches the Pillar-0 teacher's linear level at the largest size on the point estimate. Under the MLP probe it
-        saturates early: a compact student comes within about two points of the teacher and matches it only at the largest
-        sizes. The divergence between the two read-outs, not either curve alone, is the finding.
+        The parameter-performance trade-off is probe-dependent. Under the linear probe, external
+        transfer climbs with capacity and reaches the Pillar-0 teacher's linear level at the largest
+        size on the point estimate. Under the MLP probe it saturates early: a compact student comes
+        within about two points of the teacher and matches it only at the largest sizes. The
+        divergence between the two read-outs, not either curve alone, is the finding.
       </p>
       <p>
-        The parameter cut pays off most where no accelerator is available. On a single CPU core the smallest student embeds a
-        chest-CT volume in under a second, while the Pillar-0 teacher takes over a minute. On a GPU the same cut surfaces as
-        reduced memory rather than lower latency, so accuracy and inference cost must be read together.
+        The parameter cut pays off most where no accelerator is available. On a single CPU core the
+        smallest student embeds a chest-CT volume in under a second, while the Pillar-0 teacher
+        takes over a minute. On a GPU the same cut surfaces as reduced memory rather than lower
+        latency, so accuracy and inference cost must be read together.
       </p>
       <p>
-        One question stands above the rest: whether the probe-dependent trade-off belongs to the framework or to the chest-CT
-        setting in which it was measured. The thesis names the next steps:
+        One question stands above the rest: whether the probe-dependent trade-off belongs to the
+        framework or to the chest-CT setting in which it was measured. The thesis names the next
+        steps:
       </p>
       <ul class="next">
         <li>single-teacher students, starting with Pillar-0 alone;</li>

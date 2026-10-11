@@ -48,7 +48,11 @@ export class Lane {
     return this.readyPromise;
   }
 
-  private call(msg: Request, transfer: Transferable[] = [], onProgress?: Pending['onProgress']): Promise<Response> {
+  private call(
+    msg: Request,
+    transfer: Transferable[] = [],
+    onProgress?: Pending['onProgress']
+  ): Promise<Response> {
     if (this.terminated) return Promise.reject(new Error('lane was cancelled'));
     const id = this.next++;
     return new Promise((resolve, reject) => {
@@ -57,7 +61,12 @@ export class Lane {
     });
   }
 
-  async load(key: string, url: string, external: ExternalFile[] = [], onProgress?: Pending['onProgress']) {
+  async load(
+    key: string,
+    url: string,
+    external: ExternalFile[] = [],
+    onProgress?: Pending['onProgress']
+  ) {
     await this.readyPromise;
     const r = await this.call({ type: 'load', key, url, external }, [], onProgress);
     if (r.type !== 'loaded') throw new Error('unexpected reply');
@@ -70,7 +79,11 @@ export class Lane {
     await this.call({ type: 'input', key, data, shape });
   }
 
-  async run(model: string, input: string, opts: { warmup?: number; iters?: number; outputs?: string[] } = {}): Promise<RunResult> {
+  async run(
+    model: string,
+    input: string,
+    opts: { warmup?: number; iters?: number; outputs?: string[] } = {}
+  ): Promise<RunResult> {
     const r = await this.call({
       type: 'run',
       model,

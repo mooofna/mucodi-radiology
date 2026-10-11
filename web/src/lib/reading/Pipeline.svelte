@@ -14,9 +14,14 @@
   {#each steps as s (s.name)}
     <li class={s.state}>
       <span class="name">{s.name}</span>
-      <span class="bar"><span style={`width: ${s.ms ? Math.max(1, (s.ms / max) * 100) : 0}%`}></span></span>
+      <span class="bar"
+        ><span style={`width: ${s.ms ? Math.max(1, (s.ms / max) * 100) : 0}%`}></span></span
+      >
       <span class="ms num">
-        {#if s.state === 'running'}running{:else if s.ms !== null}{s.ms < 10 ? s.ms.toFixed(1) : Math.round(s.ms)} ms{:else if s.state === 'skipped'}{s.note ?? 'skipped'}{:else}&nbsp;{/if}
+        {#if s.state === 'running'}running{:else if s.ms !== null}{s.ms < 10
+            ? s.ms.toFixed(1)
+            : Math.round(s.ms)} ms{:else if s.state === 'skipped'}{s.note ??
+            'skipped'}{:else}&nbsp;{/if}
       </span>
     </li>
   {/each}

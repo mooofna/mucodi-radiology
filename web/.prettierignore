@@ -7,3 +7,4 @@ static/coi-serviceworker.js
 test-results
 playwright-report
 package-lock.json
+src/lib/volume/__fixtures__

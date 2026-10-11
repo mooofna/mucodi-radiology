@@ -43,7 +43,11 @@ export function tapAffine(gridAffine: Mat4, g: TapGeom): Mat4 {
 }
 
 /** World mm -> nearest tap cell (d, h, w), clamped to the tap grid. */
-export function cellAt(gridAffine: Mat4, g: TapGeom, mm: [number, number, number]): [number, number, number] {
+export function cellAt(
+  gridAffine: Mat4,
+  g: TapGeom,
+  mm: [number, number, number]
+): [number, number, number] {
   const [w, h, d] = apply(invert(gridAffine), mm);
   const [, D, H, W] = g.shape;
   const clamp = (v: number, n: number) => Math.min(n - 1, Math.max(0, Math.round(v)));
@@ -55,7 +59,15 @@ export function cellAt(gridAffine: Mat4, g: TapGeom, mm: [number, number, number
 }
 
 /** World mm of a tap cell centre. */
-export function cellCentre(gridAffine: Mat4, g: TapGeom, cell: [number, number, number]): [number, number, number] {
+export function cellCentre(
+  gridAffine: Mat4,
+  g: TapGeom,
+  cell: [number, number, number]
+): [number, number, number] {
   const [d, h, w] = cell;
-  return apply(gridAffine, [g.stride[2] * w + g.offset[2], g.stride[1] * h + g.offset[1], g.stride[0] * d + g.offset[0]]);
+  return apply(gridAffine, [
+    g.stride[2] * w + g.offset[2],
+    g.stride[1] * h + g.offset[1],
+    g.stride[0] * d + g.offset[0]
+  ]);
 }

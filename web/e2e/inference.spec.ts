@@ -20,9 +20,13 @@ test('TMIN encodes the bundled scan and matches the PyTorch golden', async ({ pa
 
 test('the full native pipeline in the browser also matches the golden', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Encode on this CPU' })).toBeEnabled({ timeout: 60_000 });
+  await expect(page.getByRole('button', { name: 'Encode on this CPU' })).toBeEnabled({
+    timeout: 60_000
+  });
   await page.getByLabel(/Run the full preprocessing in this tab/).check();
-  await expect(page.locator('.pipeline li', { hasText: 'Resample' })).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('.pipeline li', { hasText: 'Resample' })).toBeVisible({
+    timeout: 120_000
+  });
   await page.getByRole('button', { name: 'Encode on this CPU' }).click();
   const match = page.getByText(/Matches the thesis pipeline in PyTorch: cosine/);
   await expect(match).toBeVisible({ timeout: 120_000 });
