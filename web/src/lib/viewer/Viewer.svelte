@@ -154,16 +154,14 @@
         logLevel: 'error'
       });
       await nv.attachToCanvas(canvas);
-      nv.onLocationChange = (data: unknown) => {
-        const d = data as { mm?: number[]; vox?: number[]; values?: { value: number }[] };
-        if (onLocation && d.mm && d.vox) {
-          onLocation(
-            [d.mm[0]!, d.mm[1]!, d.mm[2]!],
-            [d.vox[0]!, d.vox[1]!, d.vox[2]!],
-            (d.values ?? []).map((v) => v.value)
-          );
-        }
+      const report = (data: unknown) => {
+        const d = data as { mm?: ArrayLike<number>; vox?: ArrayLike<number>; values?: { value: number }[] };
+        if (!onLocation || !d?.mm) return;
+        const vox = d.vox ?? [0, 0, 0];
+        onLocation([d.mm[0]!, d.mm[1]!, d.mm[2]!], [vox[0]!, vox[1]!, vox[2]!], (d.values ?? []).map((v) => v.value));
       };
+      nv.addEventListener('locationChange', (event) => report((event as CustomEvent).detail));
+      if (import.meta.env.DEV) (window as unknown as { __nv?: Niivue }).__nv = nv;
       applyLayout();
       await sync();
     });

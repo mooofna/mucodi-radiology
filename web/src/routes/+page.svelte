@@ -20,6 +20,7 @@
     type ModelsManifest
   } from '#lib/data/manifest.ts';
   import { byLabel, loadInference, loadLadder, type Inference, type LadderRung } from '#lib/data/evidence.ts';
+  import { call as netCall, cellAt, tapAffine, type TapGeom } from '#lib/network/network.ts';
   import {
     deviceFactor,
     formatSeconds,
@@ -76,7 +77,28 @@
   const loaded = new Set<string>();
   let inputKey = '';
 
+  // Network view: stage feature maps of the taps graphs (TMIN, T2, T6, B0).
+  const TAPS_RUNGS = ['tmin', 't2', 't6', 'b0'];
+  const STAGE_LABELS = ['Stem', '1', '2', '3', '4', '5', '6', '7', 'Head'];
+  let netRung = $state('t2');
+  let netKey = $state('');
+  let netGeometry = $state<TapGeom[]>([]);
+  let stageIndex = $state(3);
+  let netMode = $state<'pca' | 'similarity'>('pca');
+  let netOverlay = $state<Layer | null>(null);
+  let netExplained = $state<[number, number, number] | null>(null);
+  let netCell = $state<[number, number, number] | null>(null);
+  let netBest = $state<{ cell: [number, number, number]; value: number } | null>(null);
+  let netBusy = $state('');
+  let netError = $state('');
+  let netOpacity = $state(0.7);
+  let simMin = $state(0.6);
+  let netMm: [number, number, number] | null = null;
+  let blocks = $state(true);
+
   const win = $derived(WINDOWS[windowIndex]!);
+  const stage = $derived(netGeometry[stageIndex] ?? null);
+  const overlays = $derived<Layer[]>(netOverlay && viewMode === 'ct' ? [{ ...netOverlay, opacity: netOpacity }] : []);
   const factor = $derived(deviceFactor(measurements));
   const p0 = $derived(inference ? byLabel(inference, 'Pillar-0') : null);
   const c1 = $derived(inference ? byLabel(inference, 'Curia-1') : null);
@@ -157,8 +179,18 @@
     });
   }
 
+  function resetNetwork() {
+    netKey = '';
+    netOverlay = null;
+    netExplained = null;
+    netCell = null;
+    netBest = null;
+    netError = '';
+  }
+
   async function runPrep(get: () => Promise<{ kind: 'grid' | 'native'; buffer: ArrayBuffer; name: string }>) {
     prep = null;
+    resetNetwork();
     prepError = '';
     resetRun();
     inputKey = '';
@@ -253,6 +285,104 @@
       running = false;
     }
   }
+
+  async function computeNetwork() {
+    if (!prep || !models || netBusy) return;
+    const asset = models.rungs.find((m) => m.rung === netRung);
+    if (!asset?.files.taps || !asset.taps) return;
+    netError = '';
+    netBusy = 'Loading the stage maps model';
+    try {
+      const l = await ensureLane();
+      const key = `${netRung}.taps`;
+      if (!loaded.has(key)) {
+        await l.load(key, assetUrl(`models/${asset.files.taps[0]!.path}`));
+        loaded.add(key);
+      }
+      const caseKey = source?.kind === 'case' ? `${source.case.id}:${source.full}` : `own:${source?.name}`;
+      if (inputKey !== caseKey) {
+        await l.setInput('input', prep.input, [1, 4, ...GRID_SHAPE]);
+        inputKey = caseKey;
+      }
+      netBusy = 'Running the network';
+      const names = asset.taps.map((g) => g.name);
+      const t = performance.now();
+      const result = await l.run(key, 'input', { warmup: 0, iters: 1, outputs: names });
+      netBusy = `Analysing ${names.length} stages`;
+      const taps = names.map((n) => ({ name: n, data: result.outputs[n]!.data }));
+      const k = `${caseKey}:${netRung}`;
+      await netCall(
+        { type: 'set', key: k, taps, geometry: $state.snapshot(asset.taps) as TapGeom[], gridHu: prep.gridHu.slice(), gridShape: GRID_SHAPE },
+        taps.map((x) => x.data.buffer)
+      );
+      netGeometry = $state.snapshot(asset.taps) as TapGeom[];
+      netKey = k;
+      netBusy = '';
+      netCell = null;
+      netBest = null;
+      await showStage();
+      netBusy = '';
+      netRunMs = performance.now() - t;
+    } catch (e) {
+      netError = e instanceof Error ? e.message : String(e);
+      netBusy = '';
+    }
+  }
+
+  let netRunMs = $state<number | null>(null);
+
+  async function showStage() {
+    if (!netKey || !stage || !prep) return;
+    const affine = tapAffine(prep.gridAffine, stage);
+    if (netMode === 'pca') {
+      const r = await netCall({ type: 'pca', key: netKey, tap: stage.name });
+      if (r.type !== 'pca') return;
+      netExplained = r.explained;
+      netOverlay = {
+        key: `pca-${netKey}-${stage.name}`,
+        name: `pca-${stage.name}.nii`,
+        buffer: writeNifti(r.dims, affine, { kind: 'rgba', data: r.rgba })
+      };
+    } else if (netCell) {
+      const cell: [number, number, number] = [netCell[0], netCell[1], netCell[2]];
+      const r = await netCall({ type: 'similarity', key: netKey, tap: stage.name, cell });
+      if (r.type !== 'similarity') return;
+      netBest = { cell: r.best, value: r.bestValue };
+      netOverlay = {
+        key: `sim-${netKey}-${stage.name}-${netCell.join('.')}-${simMin}`,
+        name: `similarity-${stage.name}.nii`,
+        buffer: writeNifti(r.dims, affine, { kind: 'float32', data: r.map }),
+        colormap: 'warm',
+        calMin: simMin,
+        calMax: 1
+      };
+    } else {
+      netOverlay = null;
+    }
+  }
+
+  function onLocation(mm: [number, number, number]) {
+    if (!netKey || !stage || !prep || netMode !== 'similarity') return;
+    netMm = mm;
+    const cell = cellAt(prep.gridAffine, stage, mm);
+    if (netCell && cell.every((v, i) => v === netCell![i])) return;
+    netCell = cell;
+    showStage();
+  }
+
+  function setStage(i: number) {
+    stageIndex = i;
+    // Keep pointing at the same place in the scan when switching stages.
+    if (netMode === 'similarity' && netMm && prep && netGeometry[i]) netCell = cellAt(prep.gridAffine, netGeometry[i]!, netMm);
+    showStage();
+  }
+
+  function setNetMode(mode: 'pca' | 'similarity') {
+    netMode = mode;
+    showStage();
+  }
+
+  const fmtPct = (v: number) => `${Math.round(v * 100)} %`;
 
   function setThreads(mode: 'one' | 'all') {
     if (mode === threadsMode) return;
@@ -440,9 +570,12 @@
     <div class="canvas">
       <Viewer
         background={viewMode === 'model' ? modelLayer : background}
+        {overlays}
         window={{ center: win.center, width: win.width }}
         transfer={layout === 'render' ? PRESETS[presetIndex]!.cmap : null}
+        nearest={!!netOverlay && blocks}
         {layout}
+        {onLocation}
         label="Chest CT, multiplanar and 3D"
       />
     </div>
@@ -505,6 +638,62 @@
         </p>
       </section>
     {/if}
+    <section class="network">
+      <h2 class="label">Network view</h2>
+      <p class="muted small">
+        How the network represents this scan, stage by stage, on each stage's own grid. Not an explanation of any prediction.
+      </p>
+      <div class="netrow" role="group" aria-label="Network view model">
+        {#each TAPS_RUNGS as r (r)}
+          <button class:on={netRung === r} disabled={!!netBusy} onclick={() => { netRung = r; resetNetwork(); }}>{rungs.find((x) => x.rung === r)?.label ?? r}</button>
+        {/each}
+        <button class="primary" disabled={!prep || !!netBusy} onclick={computeNetwork}>{netKey ? 'Recompute' : 'Compute stage maps'}</button>
+      </div>
+      {#if netBusy}<p class="small">{netBusy}</p>{/if}
+      {#if netError}<p class="error">{netError}</p>{/if}
+      {#if netKey && stage}
+        <div class="netrow stages" role="group" aria-label="Stage">
+          {#each netGeometry as g, i (g.name)}
+            <button class:on={stageIndex === i} onclick={() => setStage(i)} title={`${g.name}: ${g.shape.slice(1).join(' x ')} cells`}>{STAGE_LABELS[i]}</button>
+          {/each}
+        </div>
+        <p class="small mono stageinfo">
+          {stage.name}: {stage.shape.slice(1).join(' x ')} cells, {stage.shape[0]} channels<br />
+          one cell per {stage.stride[0]} input voxels per axis, local receptive field {stage.rf[0]} voxels
+        </p>
+        <div class="netrow" role="group" aria-label="Overlay">
+          <button class:on={netMode === 'pca'} onclick={() => setNetMode('pca')}>Principal components</button>
+          <button class:on={netMode === 'similarity'} onclick={() => setNetMode('similarity')}>Similarity to a cell</button>
+        </div>
+        {#if netMode === 'pca' && netExplained}
+          <p class="small">
+            Red, green and blue are the first three principal components of the cells inside the body; together they carry
+            <span class="num">{fmtPct(netExplained[0] + netExplained[1] + netExplained[2])}</span> of the variance
+            ({fmtPct(netExplained[0])}, {fmtPct(netExplained[1])}, {fmtPct(netExplained[2])}).
+          </p>
+        {:else if netMode === 'similarity'}
+          {#if netCell && netBest}
+            <p class="small">
+              Cell <span class="mono">{netCell.join(', ')}</span>: cosine similarity of every cell's feature vector to the clicked cell, shown from
+              <span class="num">{simMin.toFixed(2)}</span> to 1.
+            </p>
+            <label class="small slider">Show from
+              <input type="range" min="0" max="0.95" step="0.05" bind:value={simMin} onchange={showStage} />
+            </label>
+          {:else}
+            <p class="small">Click a point in the scan to compare every cell with it.</p>
+          {/if}
+        {/if}
+        <label class="small slider">Opacity
+          <input type="range" min="0.1" max="1" step="0.05" bind:value={netOpacity} />
+        </label>
+        <label class="small toggle"><input type="checkbox" bind:checked={blocks} /> Show cells as blocks (no smoothing)</label>
+        <p class="muted small">
+          Each stage also receives squeeze-excitation gates pooled over the whole scan, so strictly every cell depends on the whole volume;
+          the receptive field above is the convolutional one.
+        </p>
+      {/if}
+    </section>
   </aside>
 </div>
 
@@ -704,6 +893,47 @@
   .threads {
     display: flex;
     margin-bottom: 0.5rem;
+  }
+
+  .netrow {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0.4rem 0;
+  }
+
+  .netrow button {
+    font-size: var(--text-xs);
+    margin: 0 -1px -1px 0;
+  }
+
+  .netrow button.on {
+    border-color: var(--accent);
+    color: var(--accent);
+    position: relative;
+  }
+
+  .netrow button.primary {
+    margin-left: 0.6rem;
+  }
+
+  .stages button {
+    min-width: 2.2rem;
+  }
+
+  .stageinfo {
+    color: var(--muted);
+  }
+
+  .slider {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.3rem 0;
+  }
+
+  .slider input {
+    flex: 1;
+    accent-color: var(--accent);
   }
 
   .threads button {
