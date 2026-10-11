@@ -21,11 +21,23 @@ export function median(xs: number[]): number {
   return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
 }
 
-/** f = median over measured rungs of live / thesis, with the min-max range. */
-export function deviceFactor(ms: Measurement[]): DeviceFactor | null {
-  const ratios = ms.filter((m) => m.liveMs > 0 && m.thesisMs > 0).map((m) => m.liveMs / m.thesisMs);
-  if (!ratios.length) return null;
-  return { factor: median(ratios), min: Math.min(...ratios), max: Math.max(...ratios), n: ratios.length };
+/**
+ * Device factor f = live / thesis time. When the reference student (TMIN) has been measured, its
+ * ratio is the point estimate, so the projected teacher-to-TMIN ratio equals the thesis ratio
+ * (82.6 for Pillar-0) by construction; otherwise the median over the measured students. The
+ * min-max range over all measured students is the uncertainty band.
+ */
+export function deviceFactor(ms: Measurement[], reference = 'tmin'): DeviceFactor | null {
+  const valid = ms.filter((m) => m.liveMs > 0 && m.thesisMs > 0);
+  if (!valid.length) return null;
+  const ratios = valid.map((m) => m.liveMs / m.thesisMs);
+  const ref = valid.find((m) => m.rung === reference);
+  return {
+    factor: ref ? ref.liveMs / ref.thesisMs : median(ratios),
+    min: Math.min(...ratios),
+    max: Math.max(...ratios),
+    n: ratios.length
+  };
 }
 
 export function project(thesisMs: number, f: DeviceFactor): { ms: number; lo: number; hi: number } {

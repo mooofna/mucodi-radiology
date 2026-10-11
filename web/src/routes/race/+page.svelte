@@ -331,10 +331,13 @@
     {#if factor}
       <p class="muted small">
         Projection: thesis single-thread time times this device's factor
-        <span class="num">{factor.f.factor.toFixed(2)}</span>{#if factor.f.n > 1}, range
-          <span class="num">{factor.f.min.toFixed(2)}</span> to <span class="num">{factor.f.max.toFixed(2)}</span> over {factor.f.n} students{/if}.
+        <span class="num">{factor.f.factor.toFixed(2)}</span>, the ratio of TMIN's time here to its thesis time, so the
+        projected Pillar-0 to TMIN ratio is the thesis's {tmin?.cpu_speedup_vs_pillar0?.toFixed(1)} by construction and your
+        device sets the time scale.{#if factor.f.n > 1}
+          Other students ran at ratios from <span class="num">{factor.f.min.toFixed(2)}</span> to
+          <span class="num">{factor.f.max.toFixed(2)}</span>, which would put Pillar-0 between
+          {formatSeconds(p0Ms * factor.f.min)} and {formatSeconds(p0Ms * factor.f.max)}.{/if}
         {#if factor.provisional}Provisional: estimated from the first TMIN pass of this race; the benchmark below measures each student alone.{/if}
-        With TMIN measured, the projected speed-up equals the thesis speed-up by construction; your device sets the time scale.
         Students racing side by side share memory bandwidth, so their live counts are, if anything, conservative.
       </p>
     {/if}
