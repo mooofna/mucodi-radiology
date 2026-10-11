@@ -5,12 +5,16 @@ The site serves everything under ``assets/``. Two archives go to the ``demo-asse
 evidence and the figures); ``web-assets-large.tar`` holds the B2 to B6 models, which only the
 deployed site serves. Model weights are float32 and barely compress, so the large archive is not
 gzipped. Archives are deterministic: sorted entries, zeroed owners and timestamps.
+
+Both archives carry the licence texts under ``licenses/``: the Curia-1 RAIL-M licence requires
+that every recipient of the weights also receives a copy of it.
 """
 
 from __future__ import annotations
 
 import gzip
 import hashlib
+import shutil
 import tarfile
 from pathlib import Path
 
@@ -48,15 +52,24 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def build_bundles(assets: Path, out_dir: Path) -> list[Path]:
-    """Write the two archives and a ``SHA256SUMS`` file; return the paths written."""
+def build_bundles(assets: Path, out_dir: Path, licences: list[Path] | None = None) -> list[Path]:
+    """Write the two archives and a ``SHA256SUMS`` file; return the paths written.
+
+    ``licences`` are copied to ``assets/licenses/`` first, so the site serves them too, and go
+    into both archives.
+    """
+    if licences:
+        (assets / "licenses").mkdir(parents=True, exist_ok=True)
+        for licence in licences:
+            shutil.copyfile(licence, assets / "licenses" / licence.name)
     files = sorted(p for p in assets.rglob("*") if p.is_file())
     if not files:
         raise FileNotFoundError(f"no assets under {assets}")
     entries = [(p, p.relative_to(assets).as_posix()) for p in files]
     out_dir.mkdir(parents=True, exist_ok=True)
+    texts = [(p, n) for p, n in entries if n.startswith("licenses/")]
     core = [(p, n) for p, n in entries if not is_large(Path(n))]
-    large = [(p, n) for p, n in entries if is_large(Path(n))]
+    large = [(p, n) for p, n in entries if is_large(Path(n))] + texts
     outputs = [out_dir / CORE, out_dir / LARGE]
     _write_tar(core, outputs[0], compress=True)
     _write_tar(large, outputs[1], compress=False)

@@ -88,7 +88,17 @@ def method_figure() -> None:
 def bundle() -> None:
     """Release archives of the built assets (core for CI, large for the B2 to B6 models)."""
     from mucodi_demo.bundle import build_bundles
+    from mucodi_demo.students import REPO_ROOT
 
     paths = load_paths()
-    for out in build_bundles(paths.assets, paths.work_dir / "release"):
+    licences = [
+        REPO_ROOT / name
+        for name in (
+            "WEIGHTS_LICENSE.md",
+            "DATA_LICENSE.md",
+            "licenses/CURIA_RESEARCH_RAIL-M.md",
+            "licenses/ECL-2.0.txt",
+        )
+    ]
+    for out in build_bundles(paths.assets, paths.work_dir / "release", licences):
         print(out.name, out.stat().st_size)

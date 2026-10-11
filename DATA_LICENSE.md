@@ -22,7 +22,8 @@ dcm2niix. Each case ships as:
 - for `lidc-0001` only, the full-resolution volume in Hounsfield units, int16.
 
 The method figure's eight scan panels are rendered from `lidc-0001` (resampled, randomly cropped
-and windowed with the thesis's pipeline code).
+and windowed with the thesis's pipeline code), and the README screenshot
+`docs/assets/reading-room.jpg` shows `lidc-0001` in the reading room with a network-view overlay.
 
 ## LIDC-IDRI: case `lidc-0001` (patient LIDC-IDRI-0001)
 

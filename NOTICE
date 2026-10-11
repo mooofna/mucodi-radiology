@@ -33,3 +33,15 @@ The teacher wrappers under rate-evals/rate_eval/models/ load externally publishe
 foundation models (CT-CLIP, Curia, Pillar-0, TANGERINE). Those model weights are
 not distributed here; obtain them from their respective providers under their own
 terms.
+
+5. nibabel (ported to TypeScript for the web demo)
+   The browser preprocessing in web/src/lib/volume/ ports nibabel 5.4.2's affine precedence
+   (get_best_affine) and orientation logic (io_orientation, apply_orientation).
+   Copyright (c) the NiBabel developers.
+   License: MIT.
+   Source:  https://github.com/nipy/nibabel
+
+The web demo's npm dependencies (ONNX Runtime Web, NiiVue, dcm2niix, Observable Plot, Svelte,
+IBM Plex and others; see web/package.json) are installed at build time, not vendored, and keep
+their own licenses. The student weights and the bundled scans are licensed separately; see
+WEIGHTS_LICENSE.md and DATA_LICENSE.md.

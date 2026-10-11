@@ -30,11 +30,18 @@ def names(archive: Path) -> list[str]:
 
 def test_core_has_everything_but_the_large_models(tmp_path: Path) -> None:
     make_assets(tmp_path / "assets")
-    build_bundles(tmp_path / "assets", tmp_path / "out")
-    assert names(tmp_path / "out" / LARGE) == ["models/b2.core.onnx", "models/b6.core.onnx.data1"]
+    licence = tmp_path / "WEIGHTS_LICENSE.md"
+    licence.write_text("research use only")
+    build_bundles(tmp_path / "assets", tmp_path / "out", [licence])
+    assert names(tmp_path / "out" / LARGE) == [
+        "models/b2.core.onnx",
+        "models/b6.core.onnx.data1",
+        "licenses/WEIGHTS_LICENSE.md",
+    ]
     assert names(tmp_path / "out" / CORE) == [
         "cases/lidc-0001.grid.nii.gz",
         "evidence/curves/lidc.json",
+        "licenses/WEIGHTS_LICENSE.md",
         "models/b0.taps.onnx",
         "models/models.json",
         "models/tmin.core.onnx",

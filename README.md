@@ -12,11 +12,42 @@ This is the code for the bachelor thesis *On the Parameter-Performance Trade-Off
 Radiology Foundation Models* (TU Dresden), written at Harvard Medical School and
 Massachusetts General Hospital. It is a fork of the pathology companion framework.
 
-The repository has two coupled parts:
+## Live demo
+
+**[Open the demo](https://mooofna.github.io/mucodi-radiology/)** |
+[Method](https://mooofna.github.io/mucodi-radiology/method) |
+[Evidence](https://mooofna.github.io/mucodi-radiology/evidence) |
+[Weights and data](https://github.com/mooofna/mucodi-radiology/releases/tag/demo-assets)
+
+[![The reading room: a TMIN encode on one CPU thread, with the network view of stage 2 in the slices and in a 3D cutaway](docs/assets/reading-room.jpg)](https://mooofna.github.io/mucodi-radiology/)
+
+The fourteen students run in the browser, on the visitor's CPU, through ONNX Runtime Web:
+
+* **Reading room.** Three public chest CTs or your own scan (NIfTI, or a DICOM folder converted
+  in the browser; nothing is uploaded) go through the thesis's evaluation preprocessing, ported
+  to TypeScript, and are encoded on one CPU thread with per-step timings. The network view shows
+  every stage's feature maps on their true grid, as PCA colours or feature similarity, in the
+  slices and in 3D.
+* **CPU race.** TMIN and a larger student run live; Pillar-0 and Curia-1 are projected onto the
+  visitor's machine from their single-core times in thesis Table 6.5 through a measured device
+  factor. A benchmark reproduces the table's student column on the visitor's CPU.
+* **Evidence.** Every number is rebuilt from the thesis result files and checked against the
+  thesis tables, with ROC and precision-recall curves for all 81 endpoints.
+
+[![Average external AUROC against encoder parameters for the MLP and linear probes](docs/assets/evidence-tradeoff.png)](https://mooofna.github.io/mucodi-radiology/evidence)
+
+The browser reproduces the embeddings of the thesis pipeline in PyTorch (the test suite requires
+a cosine of at least 0.9999). It is a research demo, not a medical device. The scans in the
+screenshot are LIDC-IDRI-0001 (CC BY 3.0, see [`DATA_LICENSE.md`](DATA_LICENSE.md)).
+
+The repository has three parts:
 
 1. **The KD training framework:** `main.py`, `moco/`, `models/`, `dataprep/`, `utils/`.
 2. **The `rate_eval` evaluation harness:** `rate-evals/`, a self-contained, tested
    package that loads each teacher through a wrapper and runs the read-out evaluations.
+3. **The in-browser demo:** `demo/`, the offline asset pipeline (ONNX export with parity
+   checks, demo cases, evidence; see [`demo/README.md`](demo/README.md)), and `web/`, the
+   SvelteKit site.
 
 Orchestration is shared across both: `experiments/` (declarative studies and a Slurm
 launcher), `jobs/` (env and Slurm settings), and `scripts/` (external-teacher setup).
@@ -144,9 +175,14 @@ source datasets, the teacher model weights, and A100-class compute.
 ## License
 
 Original code: **CC BY-NC 4.0** (see [`LICENSE`](LICENSE)). Third-party components
-(MoCo v3, MONAI, the `rate_eval`/RAVE harness) are under their own licenses; see
+(MoCo v3, MONAI, the `rate_eval`/RAVE harness, nibabel) are under their own licenses; see
 [`NOTICE`](NOTICE). The bundled `rate-evals/` package carries its own license
 ([`rate-evals/LICENSE`](rate-evals/LICENSE), ECL 2.0).
+
+The trained student weights are for research use only and carry the use restrictions of
+Curia-1's Research-Only RAIL-M licence ([`WEIGHTS_LICENSE.md`](WEIGHTS_LICENSE.md)). The demo
+scans keep their own licences, CC BY 3.0 (LIDC-IDRI) and CC BY-NC 4.0 (MIDRC-RICORD-1A)
+([`DATA_LICENSE.md`](DATA_LICENSE.md)).
 
 ## Citation
 
