@@ -1,0 +1,10 @@
+# Copy to configs/local.toml (not tracked) and point the paths at this machine.
+[paths]
+# The runs/ folder of the read-only Dropbox share with the training checkpoints and eval outputs.
+dropbox_runs = "~/Library/CloudStorage/Dropbox/mucodi-radiology/runs"
+# The thesis workspace's code/ folder (experiments/studies/*/results).
+thesis_code = "~/path/to/bachelor-thesis/code"
+# Tidy per-table CSVs exported from the thesis (cross-check for the evidence build).
+thesis_tables = "~/path/to/thesis-tables"
+# Where downloads, checkpoints and built assets go. Relative paths are below demo/.
+work_dir = ".local"

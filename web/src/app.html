@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
+    <script>
+      // Apply the stored theme before first paint to avoid a flash.
+      try {
+        const t = localStorage.getItem('theme');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      } catch {}
+      // Cross-origin isolation (needed only for multi-threaded WASM) is switched on lazily:
+      // the service worker registers only after a visitor has asked for all CPU cores once.
+      window.coi = {
+        shouldRegister: () => {
+          try {
+            return localStorage.getItem('mucodi-threads') === 'all';
+          } catch {
+            return false;
+          }
+        },
+        shouldDeregister: () => false,
+        coepCredentialless: () => false,
+        doReload: () => window.location.reload(),
+        quiet: true
+      };
+    </script>
+    <script src="%sveltekit.assets%/coi-serviceworker.js"></script>
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

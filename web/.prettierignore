@@ -1,0 +1,9 @@
+build
+.svelte-kit
+node_modules
+static/assets
+static/ort
+static/coi-serviceworker.js
+test-results
+playwright-report
+package-lock.json
