@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 
 from mucodi_demo.evidence import EvidenceMismatch, Sources
 
@@ -221,7 +222,7 @@ def build_tradeoff(src: Sources) -> dict[str, Any]:
                 }
             )
         out["probes"][probe] = rows
-    out["spread_definition"] = "2.262 x SD / sqrt(10) over the ten external units"
+    out["spread_definition"] = "2.262 \u00d7 SD / \u221a10 over the ten external units"
     out["src"] = ["cross_cohort_cells", "table6_2", "table6_3"]
     return out
 
@@ -308,7 +309,7 @@ def build_endpoints(src: Sources) -> dict[str, Any]:
     return {"endpoints": list(out.values()), "src": ["endpoint_characteristics", "endpoint_auroc"]}
 
 
-def _roc_pr(labels: np.ndarray, scores: np.ndarray) -> dict[str, Any]:
+def _roc_pr(labels: npt.NDArray[np.int64], scores: npt.NDArray[np.float64]) -> dict[str, Any]:
     order = np.argsort(-scores, kind="mergesort")
     y = labels[order]
     s = scores[order]
@@ -416,7 +417,7 @@ def build_deploy(src: Sources) -> dict[str, Any]:
             "Thesis Table 6.4 (cold deploy)",
         )
     )
-    raw = _csv(
+    cells = _csv(
         src.add(
             "deploy_cells",
             src.paths.thesis_code
@@ -424,8 +425,8 @@ def build_deploy(src: Sources) -> dict[str, Any]:
             "Cold-deploy cell results (Table 6.4 source)",
         )
     )
-    raw_by = {(r["model"], r["variant"], r["side"]): float(r["macro_auroc"]) * 100 for r in raw}
-    rows = []
+    raw_by = {(r["model"], r["variant"], r["side"]): float(r["macro_auroc"]) * 100 for r in cells}
+    rows: list[dict[str, Any]] = []
     for t in table:
         rows.append(
             {

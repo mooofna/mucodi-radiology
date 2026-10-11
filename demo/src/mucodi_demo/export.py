@@ -13,14 +13,19 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
+import numpy.typing as npt
 import onnx
 import onnxruntime as ort
 import torch
 from torch import nn
 
 from mucodi_demo.students import INPUT_SHAPE, LoadedStudent
+
+if TYPE_CHECKING:
+    from monai.networks.nets.efficientnet import EfficientNet
 
 OPSET = 18
 TAP_NAMES: tuple[str, ...] = (
@@ -53,7 +58,7 @@ class Taps(nn.Module):
 
     def __init__(self, backbone: nn.Module) -> None:
         super().__init__()
-        self.net = backbone.net  # type: ignore[union-attr]
+        self.net = cast("EfficientNet", backbone.net)
 
     def forward(self, volume: torch.Tensor) -> tuple[torch.Tensor, ...]:
         net = self.net
@@ -109,12 +114,14 @@ class Parity:
     max_rel: float
 
 
-def cosine(a: np.ndarray, b: np.ndarray) -> float:
+def cosine(a: npt.NDArray[np.float32], b: npt.NDArray[np.float32]) -> float:
     a64, b64 = a.astype(np.float64).ravel(), b.astype(np.float64).ravel()
     return float(a64 @ b64 / (np.linalg.norm(a64) * np.linalg.norm(b64)))
 
 
-def check_parity(student: LoadedStudent, onnx_path: Path, volume: np.ndarray) -> Parity:
+def check_parity(
+    student: LoadedStudent, onnx_path: Path, volume: npt.NDArray[np.float32]
+) -> Parity:
     """Compare the ONNX Runtime CPU embedding with PyTorch on ``volume`` (1, 4, D, H, W)."""
     with torch.no_grad():
         ref = student.backbone(torch.from_numpy(volume)).numpy()

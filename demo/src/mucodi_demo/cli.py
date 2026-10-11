@@ -82,3 +82,13 @@ def method_figure() -> None:
     tikz = paths.thesis_code.parent / "defense" / "tikz"
     for out in build_figure(tikz, panels, paths.work_dir / "tikz-build", paths.assets / "figures"):
         print(out.name, out.stat().st_size)
+
+
+@app.command()
+def bundle() -> None:
+    """Release archives of the built assets (core for CI, large for the B2 to B6 models)."""
+    from mucodi_demo.bundle import build_bundles
+
+    paths = load_paths()
+    for out in build_bundles(paths.assets, paths.work_dir / "release"):
+        print(out.name, out.stat().st_size)

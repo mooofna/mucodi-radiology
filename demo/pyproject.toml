@@ -31,6 +31,15 @@ mucodi-demo = "mucodi_demo.cli:app"
 [dependency-groups]
 dev = ["mypy>=1.15", "pytest>=8.3", "ruff>=0.11"]
 
+# On Linux (CI) torch comes from the CPU-only index; the default wheel pulls in gigabytes of CUDA.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [build-system]
 requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
@@ -50,6 +59,14 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 strict = true
 python_version = "3.12"
 ignore_missing_imports = true
+# Both ship py.typed but leave most constructors and methods unannotated.
+untyped_calls_exclude = ["nibabel", "idc_index"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    # The thesis-era TorchScript exporter is used on purpose (dynamo=False); its notices are noise.
+    "ignore::DeprecationWarning:torch.*",
+    "ignore:You are using the legacy TorchScript-based ONNX export:DeprecationWarning",
+    "ignore:Constant folding:UserWarning",
+]

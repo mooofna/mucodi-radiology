@@ -15,16 +15,18 @@ from __future__ import annotations
 import itertools
 import json
 from pathlib import Path
+from typing import Any, cast
 
 import nibabel as nib
 import numpy as np
+import numpy.typing as npt
 
 from mucodi_demo import reference
 
 FIXTURES = Path(__file__).resolve().parents[3] / "web" / "src" / "lib" / "volume" / "__fixtures__"
 
 
-def _rot(axis: int, angle_deg: float) -> np.ndarray:
+def _rot(axis: int, angle_deg: float) -> npt.NDArray[np.float64]:
     a = np.deg2rad(angle_deg)
     c, s = np.cos(a), np.sin(a)
     r = np.eye(3)
@@ -126,11 +128,11 @@ def nifti_cases(rng: np.random.Generator, folder: Path) -> list[dict[str, object
     out = []
     for name, dtype, aff, codes, slope, inter, big, version in specs:
         if np.issubdtype(dtype, np.integer):
-            info = np.iinfo(dtype)
+            info = np.iinfo(cast(type[np.integer[Any]], dtype))
             data = rng.integers(max(info.min, -2000), min(info.max, 3000), shape).astype(dtype)
         else:
             data = rng.uniform(-1000, 1000, shape).astype(dtype)
-        cls = nib.Nifti2Image if version == 2 else nib.Nifti1Image
+        cls: type[nib.Nifti1Image] = nib.Nifti2Image if version == 2 else nib.Nifti1Image
         img = cls(data, aff)
         hdr = img.header
         hdr.set_data_dtype(data.dtype.newbyteorder(">") if big else data.dtype)
@@ -149,7 +151,7 @@ def nifti_cases(rng: np.random.Generator, folder: Path) -> list[dict[str, object
         suffix = ".nii.gz" if name.endswith("_gz") else ".nii"
         path = folder / f"{name}{suffix}"
         nib.save(img, str(path))
-        loaded = nib.load(str(path))
+        loaded = cast(nib.Nifti1Image, nib.load(str(path)))
         canon = nib.as_closest_canonical(loaded)
         expected = np.asarray(canon.get_fdata(), dtype=np.float32)
         out.append(

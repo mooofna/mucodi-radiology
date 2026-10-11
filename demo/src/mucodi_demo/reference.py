@@ -21,6 +21,7 @@ from pathlib import Path
 from types import ModuleType
 
 import numpy as np
+import numpy.typing as npt
 import torch
 
 from mucodi_demo.students import REPO_ROOT
@@ -64,20 +65,22 @@ def _modules() -> dict[str, ModuleType]:
     }
 
 
-def read_hu(path: Path) -> np.ndarray:
+def read_hu(path: Path) -> npt.NDArray[np.float32]:
     """NIfTI -> float32 HU (D, H, W) in closest canonical RAS, as the eval loader reads it."""
     m = _modules()
     img = m["affine_repair"].safe_canonical(str(path))
     return np.asarray(img.get_fdata(), dtype=np.float32).transpose(2, 0, 1)
 
 
-def canonical_affine(path: Path) -> np.ndarray:
+def canonical_affine(path: Path) -> npt.NDArray[np.float64]:
     """Affine of the canonical image, i.e. voxel (x, y, z) of ``read_hu`` before the transpose."""
     m = _modules()
     return np.asarray(m["affine_repair"].safe_canonical(str(path)).affine, dtype=np.float64)
 
 
-def resize(hu: np.ndarray, shape: tuple[int, int, int] = TARGET_SHAPE) -> np.ndarray:
+def resize(
+    hu: npt.NDArray[np.float32], shape: tuple[int, int, int] = TARGET_SHAPE
+) -> npt.NDArray[np.float32]:
     """Full field of view trilinear resize with the thesis code path."""
     m = _modules()
     x = torch.from_numpy(np.ascontiguousarray(hu))[None, None]
@@ -86,7 +89,7 @@ def resize(hu: np.ndarray, shape: tuple[int, int, int] = TARGET_SHAPE) -> np.nda
     return np.asarray(y[0, 0].numpy(), dtype=np.float32)
 
 
-def window(resized: np.ndarray) -> np.ndarray:
+def window(resized: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
     """(D, H, W) HU -> (1, 4, D, H, W) model input with the thesis windowing code."""
     m = _modules()
     x = torch.from_numpy(np.ascontiguousarray(resized))[None, None]
@@ -97,5 +100,5 @@ def window(resized: np.ndarray) -> np.ndarray:
     return np.asarray(y.numpy(), dtype=np.float32)
 
 
-def model_input(path: Path) -> np.ndarray:
+def model_input(path: Path) -> npt.NDArray[np.float32]:
     return window(resize(read_hu(path)))

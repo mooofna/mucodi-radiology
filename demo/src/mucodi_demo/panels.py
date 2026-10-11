@@ -21,6 +21,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 from matplotlib.patches import Rectangle
 from PIL import Image
 
@@ -41,8 +42,8 @@ TIKZ_FILES = (
 
 
 def _crop(
-    rng: np.random.Generator, vol: np.ndarray
-) -> tuple[np.ndarray, tuple[slice, slice, slice]]:
+    rng: np.random.Generator, vol: npt.NDArray[np.float32]
+) -> tuple[npt.NDArray[np.float32], tuple[slice, slice, slice]]:
     """Anisotropic random-resized crop: axial scale in [0.95, 1], in-plane in [0.85, 1]."""
     sizes = []
     for n, lo in zip(vol.shape, (0.95, 0.85, 0.85), strict=True):
@@ -55,7 +56,13 @@ def _crop(
     return reference.resize(vol[sd, sh, sw], TARGET), (sd, sh, sw)
 
 
-def _export(arr: np.ndarray, path: Path, vmin: float, vmax: float, boxes=None) -> None:  # type: ignore[no-untyped-def]
+def _export(
+    arr: npt.NDArray[np.float32],
+    path: Path,
+    vmin: float,
+    vmax: float,
+    boxes: list[tuple[slice, slice, str]] | None = None,
+) -> None:
     fig = plt.figure(figsize=(3, 3), dpi=300)
     ax = fig.add_axes((0.0, 0.0, 1.0, 1.0))
     ax.imshow(arr, cmap="gray", vmin=vmin, vmax=vmax, interpolation="nearest", aspect="equal")
@@ -151,7 +158,7 @@ def slim_svg(svg: Path, max_px: int = 320) -> None:
             alias[ident] = first[payload]
             return ""
         first[payload] = ident
-        img = Image.open(io.BytesIO(base64.b64decode(payload)))
+        img: Image.Image = Image.open(io.BytesIO(base64.b64decode(payload)))
         if img.mode not in ("L", "LA", "RGB", "RGBA"):
             img = img.convert("RGBA")
         img.thumbnail((max_px, max_px), Image.Resampling.LANCZOS)

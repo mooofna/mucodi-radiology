@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, cast
 
 import nibabel as nib
 import numpy as np
+import numpy.typing as npt
 import torch
 
 from mucodi_demo import reference
@@ -21,23 +23,23 @@ from mucodi_demo.students import RUNGS, load_student
 GRID_MIN_COSINE = 0.99999
 
 
-def grid_input(grid_path: Path) -> np.ndarray:
+def grid_input(grid_path: Path) -> npt.NDArray[np.float32]:
     """The browser's instant path: dequantise the grid file and window it."""
-    img = nib.load(str(grid_path))
+    img = cast(nib.Nifti1Image, nib.load(str(grid_path)))
     hu_ijk = np.asarray(img.get_fdata(), dtype=np.float32)  # (W, H, D); applies scl_slope = 0.1
     return reference.window(hu_ijk.transpose(2, 1, 0))
 
 
 def build_goldens(checkpoints: Path, cases_dir: Path, downloads: Path) -> dict[str, object]:
     cases = json.loads((cases_dir / "cases.json").read_text())["cases"]
-    inputs: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    inputs: dict[str, tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]] = {}
     for case in cases:
         native = next((downloads / case["id"] / "nifti").glob("native*.nii"))
         inputs[case["id"]] = (
             reference.model_input(native),
             grid_input(cases_dir / case["files"]["grid"]),
         )
-    out: dict[str, dict[str, object]] = {cid: {} for cid in inputs}
+    out: dict[str, dict[str, dict[str, Any]]] = {cid: {} for cid in inputs}
     torch.set_num_threads(max(1, torch.get_num_threads()))
     for rung in RUNGS:
         student = load_student(rung, checkpoints / f"{rung}.pth.tar")
@@ -53,7 +55,7 @@ def build_goldens(checkpoints: Path, cases_dir: Path, downloads: Path) -> dict[s
             rung,
             {cid: round(float(v[rung]["grid_cosine"]), 9) for cid, v in out.items()},
             flush=True,
-        )  # type: ignore[index]
+        )
     result: dict[str, object] = {
         "source": "PyTorch fp32, thesis preprocessing (rate_eval readers, preprocess, windowing)",
         "cases": out,

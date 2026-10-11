@@ -21,9 +21,11 @@ import shutil
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import cast
 
 import nibabel as nib
 import numpy as np
+import numpy.typing as npt
 
 from mucodi_demo import reference
 
@@ -73,7 +75,9 @@ def convert(dicom_dir: Path, out: Path) -> Path:
     return files[0]
 
 
-def grid_affine(canonical: np.ndarray, shape_xyz: tuple[int, int, int]) -> np.ndarray:
+def grid_affine(
+    canonical: npt.NDArray[np.float64], shape_xyz: tuple[int, int, int]
+) -> npt.NDArray[np.float64]:
     """World affine of the model grid stored in NIfTI voxel order (i, j, k) = (W, H, D).
 
     That order makes the stored (Fortran) data identical to the model's (D, H, W) C-order array,
@@ -84,7 +88,7 @@ def grid_affine(canonical: np.ndarray, shape_xyz: tuple[int, int, int]) -> np.nd
     sx = shape_xyz[0] / reference.TARGET_SHAPE[1]
     sy = shape_xyz[1] / reference.TARGET_SHAPE[2]
     sz = shape_xyz[2] / reference.TARGET_SHAPE[0]
-    scale = np.array(
+    scale: npt.NDArray[np.float64] = np.array(
         [
             [0, sx, 0, 0.5 * sx - 0.5],
             [sy, 0, 0, 0.5 * sy - 0.5],
@@ -95,7 +99,12 @@ def grid_affine(canonical: np.ndarray, shape_xyz: tuple[int, int, int]) -> np.nd
     return canonical @ scale
 
 
-def _save(data_xyz: np.ndarray, affine: np.ndarray, path: Path, scl_slope: float = 1.0) -> None:
+def _save(
+    data_xyz: npt.NDArray[np.int16],
+    affine: npt.NDArray[np.float64],
+    path: Path,
+    scl_slope: float = 1.0,
+) -> None:
     img = nib.Nifti1Image(data_xyz, affine)
     img.header.set_data_dtype(data_xyz.dtype)
     img.header.set_xyzt_units("mm")
@@ -142,7 +151,10 @@ def build_case(spec: CaseSpec, downloads: Path, out_dir: Path) -> dict[str, obje
     )  # NIfTI (i, j, k) = (W, H, D): Fortran order == (D, H, W) C order
     grid = np.clip(np.rint(grid_ijk * HU_SCALE), -32768, 32767).astype(np.int16)
     _save(
-        grid, grid_affine(canon, hu_xyz.shape), out_dir / f"{spec.id}.grid.nii.gz", 1.0 / HU_SCALE
+        grid,
+        grid_affine(canon, cast(tuple[int, int, int], hu_xyz.shape)),
+        out_dir / f"{spec.id}.grid.nii.gz",
+        1.0 / HU_SCALE,
     )
 
     files = {"view": f"{spec.id}.view.nii.gz", "grid": f"{spec.id}.grid.nii.gz"}

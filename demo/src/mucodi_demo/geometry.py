@@ -14,12 +14,18 @@ every input voxel. ``rf`` is the local receptive field of the convolution path o
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from typing import TYPE_CHECKING, cast
 
 import torch
 from torch import nn
 
 from mucodi_demo.export import TAP_NAMES, Taps
 from mucodi_demo.students import INPUT_SHAPE
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from monai.networks.nets.efficientnet import EfficientNet, MBConvBlock
 
 
 @dataclass(frozen=True)
@@ -46,7 +52,7 @@ class _Walker:
         if isinstance(pad, nn.Identity):
             before = [0, 0, 0]
         else:
-            p = tuple(pad.padding)  # type: ignore[union-attr, arg-type]
+            p = tuple(pad.padding)  # type: ignore[arg-type]
             # ConstantPad3d order is (W_left, W_right, H_left, H_right, D_left, D_right).
             before = [int(p[4]), int(p[2]), int(p[0])]
         if any(int(x) != 0 for x in conv.padding):  # type: ignore[union-attr]
@@ -73,7 +79,7 @@ class _Walker:
 
 def tap_geometry(backbone: nn.Module) -> list[TapGeometry]:
     """Geometry of every tap of :class:`mucodi_demo.export.Taps`, in output order."""
-    net = backbone.net  # type: ignore[union-attr]
+    net = cast("EfficientNet", backbone.net)
     with torch.no_grad():
         outputs = Taps(backbone).eval()(torch.zeros(INPUT_SHAPE))
     shapes = [tuple(t.shape) for t in outputs[1:]]
@@ -82,7 +88,7 @@ def tap_geometry(backbone: nn.Module) -> list[TapGeometry]:
     walker.conv(net._conv_stem_padding, net._conv_stem)
     geoms = [walker.snapshot(TAP_NAMES[0], shapes[0])]
     for i, stage in enumerate(net._blocks):
-        for block in stage:
+        for block in cast("Iterable[MBConvBlock]", stage):
             if block.expand_ratio != 1:
                 walker.conv(block._expand_conv_padding, block._expand_conv)
             walker.conv(block._depthwise_conv_padding, block._depthwise_conv)
