@@ -219,8 +219,17 @@ def write_json(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(clean(payload), indent=1) + "\n")
 
 
-def build_evidence(paths: Paths, out_dir: Path) -> None:
+def build_evidence(paths: Paths, out_dir: Path, curves: bool = True) -> None:
+    from mucodi_demo import evidence_results as res
+
     src = Sources(paths)
     write_json(out_dir / "inference.json", build_inference(src))
     write_json(out_dir / "ladder.json", build_ladder(src))
+    write_json(out_dir / "tradeoff.json", res.build_tradeoff(src))
+    write_json(out_dir / "cohorts.json", res.build_cohorts(src))
+    write_json(out_dir / "endpoints.json", res.build_endpoints(src))
+    write_json(out_dir / "deploy.json", res.build_deploy(src))
+    if curves:
+        report = res.build_curves(src, out_dir / "curves")
+        write_json(out_dir / "curves_report.json", report)
     write_json(out_dir / "sources.json", src.entries)
