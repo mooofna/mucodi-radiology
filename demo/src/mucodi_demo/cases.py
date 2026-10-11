@@ -174,7 +174,7 @@ def build_case(spec: CaseSpec, downloads: Path, out_dir: Path) -> dict[str, obje
 
 LIDC_ATTRIBUTION = (
     "The authors acknowledge the National Cancer Institute and the Foundation for the National "
-    "Institutes of Health and their critical role in the creation of the free publicly available "
+    "Institutes of Health, and their critical role in the creation of the free publicly available "
     "LIDC/IDRI Database used in this study."
 )
 

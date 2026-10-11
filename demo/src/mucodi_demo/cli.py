@@ -58,9 +58,27 @@ def web_goldens() -> None:
 
 
 @app.command()
-def evidence() -> None:
+def evidence(
+    curves: bool = typer.Option(
+        True, help="Also build ROC/PR curves from the Dropbox OOF predictions"
+    ),
+) -> None:
     """Evidence JSON for the web page from the thesis artifacts (with provenance checks)."""
     from mucodi_demo.evidence import build_evidence
 
     paths = load_paths()
-    build_evidence(paths, paths.assets / "evidence")
+    build_evidence(paths, paths.assets / "evidence", curves=curves)
+
+
+@app.command("method-figure")
+def method_figure() -> None:
+    """MuCoDi overview figure (TikZ from the thesis) with panels from the LIDC hero case."""
+    from mucodi_demo.panels import build_figure, render_panels
+
+    paths = load_paths()
+    native = next((paths.downloads / "lidc-0001" / "nifti").glob("native*.nii"))
+    panels = paths.work_dir / "panels" / "mucodi_panels"
+    render_panels(native, panels)
+    tikz = paths.thesis_code.parent / "defense" / "tikz"
+    for out in build_figure(tikz, panels, paths.work_dir / "tikz-build", paths.assets / "figures"):
+        print(out.name, out.stat().st_size)
