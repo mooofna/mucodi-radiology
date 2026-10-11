@@ -19,7 +19,13 @@
     type Goldens,
     type ModelsManifest
   } from '#lib/data/manifest.ts';
-  import { byLabel, loadInference, loadLadder, type Inference, type LadderRung } from '#lib/data/evidence.ts';
+  import {
+    byLabel,
+    loadInference,
+    loadLadder,
+    type Inference,
+    type LadderRung
+  } from '#lib/data/evidence.ts';
   import { call as netCall, cellAt, tapAffine, type TapGeom } from '#lib/network/network.ts';
   import {
     deviceFactor,
@@ -98,18 +104,24 @@
 
   const win = $derived(WINDOWS[windowIndex]!);
   const stage = $derived(netGeometry[stageIndex] ?? null);
-  const overlays = $derived<Layer[]>(netOverlay && viewMode === 'ct' ? [{ ...netOverlay, opacity: netOpacity }] : []);
+  const overlays = $derived<Layer[]>(
+    netOverlay && viewMode === 'ct' ? [{ ...netOverlay, opacity: netOpacity }] : []
+  );
   const factor = $derived(deviceFactor(measurements));
   const p0 = $derived(inference ? byLabel(inference, 'Pillar-0') : null);
   const c1 = $derived(inference ? byLabel(inference, 'Curia-1') : null);
-  const thesisMs = (r: string) => inference?.records.find((x) => x.rung === r)?.cpu_median_ms ?? null;
+  const thesisMs = (r: string) =>
+    inference?.records.find((x) => x.rung === r)?.cpu_median_ms ?? null;
 
   const rungs = $derived<Rung[]>(
     ladder.map((l) => {
       const asset = models?.rungs.find((m) => m.rung === l.rung);
       const bytes = asset ? asset.files.core.reduce((s, f) => s + f.bytes, 0) : null;
       const big = l.params_m > 13;
-      const lowMemory = typeof navigator !== 'undefined' && (navigator as { deviceMemory?: number }).deviceMemory !== undefined && ((navigator as { deviceMemory?: number }).deviceMemory ?? 8) < 8;
+      const lowMemory =
+        typeof navigator !== 'undefined' &&
+        (navigator as { deviceMemory?: number }).deviceMemory !== undefined &&
+        ((navigator as { deviceMemory?: number }).deviceMemory ?? 8) < 8;
       return {
         rung: l.rung,
         label: l.label,
@@ -154,7 +166,7 @@
       .catch((e: unknown) => (loadError = e instanceof Error ? e.message : String(e)));
   });
 
-  onDestroy(() => lane?.terminate());  // lane only exists in the browser
+  onDestroy(() => lane?.terminate()); // lane only exists in the browser
 
   function resetRun() {
     forwardMs = null;
@@ -172,10 +184,18 @@
 
   async function selectCase(c: CaseAsset, full: boolean) {
     source = { kind: 'case', case: c, full };
-    background = { key: `view-${c.id}`, name: c.files.view, url: assetUrl(`cases/${c.files.view}`) };
+    background = {
+      key: `view-${c.id}`,
+      name: c.files.view,
+      url: assetUrl(`cases/${c.files.view}`)
+    };
     await runPrep(async () => {
       const file = full && c.files.full ? c.files.full : c.files.grid;
-      return { kind: full && c.files.full ? 'native' : 'grid', buffer: await fetchBuffer(assetUrl(`cases/${file}`)), name: file };
+      return {
+        kind: full && c.files.full ? 'native' : 'grid',
+        buffer: await fetchBuffer(assetUrl(`cases/${file}`)),
+        name: file
+      };
     });
   }
 
@@ -188,7 +208,9 @@
     netError = '';
   }
 
-  async function runPrep(get: () => Promise<{ kind: 'grid' | 'native'; buffer: ArrayBuffer; name: string }>) {
+  async function runPrep(
+    get: () => Promise<{ kind: 'grid' | 'native'; buffer: ArrayBuffer; name: string }>
+  ) {
     prep = null;
     resetNetwork();
     prepError = '';
@@ -200,7 +222,10 @@
       const { kind, buffer, name } = await get();
       prepSteps = [{ name: 'Download', ms: performance.now() - t0, state: 'done' }];
       const result = await prepare(kind, buffer, name);
-      prepSteps = [...prepSteps, ...result.timings.map((t) => ({ name: t.name, ms: t.ms, state: 'done' as const }))];
+      prepSteps = [
+        ...prepSteps,
+        ...result.timings.map((t) => ({ name: t.name, ms: t.ms, state: 'done' as const }))
+      ];
       prep = result;
     } catch (e) {
       prepError = e instanceof Error ? e.message : String(e);
@@ -251,7 +276,8 @@
       set(0, { ms: performance.now() - t, state: 'done' });
       set(1, { state: 'running' });
       t = performance.now();
-      const caseKey = source?.kind === 'case' ? `${source.case.id}:${source.full}` : `own:${source?.name}`;
+      const caseKey =
+        source?.kind === 'case' ? `${source.case.id}:${source.full}` : `own:${source?.name}`;
       if (inputKey !== caseKey) {
         await l.setInput('input', prep.input, [1, 4, ...GRID_SHAPE]);
         inputKey = caseKey;
@@ -261,9 +287,9 @@
       let wasHidden = document.visibilityState === 'hidden';
       const watch = () => (wasHidden ||= document.visibilityState === 'hidden');
       document.addEventListener('visibilitychange', watch);
-      const result = await l.run(key, 'input', { warmup: 0, iters: 2, outputs: ['embedding'] }).finally(() =>
-        document.removeEventListener('visibilitychange', watch)
-      );
+      const result = await l
+        .run(key, 'input', { warmup: 0, iters: 2, outputs: ['embedding'] })
+        .finally(() => document.removeEventListener('visibilitychange', watch));
       hiddenRun = wasHidden;
       set(2, { ms: result.times[0]!, state: 'done' });
       set(3, { ms: result.times[1]!, state: 'done' });
@@ -275,7 +301,8 @@
       }
       const th = thesisMs(rung);
       // Background tabs are throttled by the browser; such timings are shown but not kept.
-      if (l.threads === 1 && th && !hiddenRun) measurements = saveMeasurement({ rung, liveMs: forwardMs, thesisMs: th });
+      if (l.threads === 1 && th && !hiddenRun)
+        measurements = saveMeasurement({ rung, liveMs: forwardMs, thesisMs: th });
     } catch (e) {
       runError = e instanceof Error ? e.message : String(e);
       runSteps = runSteps.map((s) => (s.state === 'running' ? { ...s, state: 'pending' } : s));
@@ -299,7 +326,8 @@
         await l.load(key, assetUrl(`models/${asset.files.taps[0]!.path}`));
         loaded.add(key);
       }
-      const caseKey = source?.kind === 'case' ? `${source.case.id}:${source.full}` : `own:${source?.name}`;
+      const caseKey =
+        source?.kind === 'case' ? `${source.case.id}:${source.full}` : `own:${source?.name}`;
       if (inputKey !== caseKey) {
         await l.setInput('input', prep.input, [1, 4, ...GRID_SHAPE]);
         inputKey = caseKey;
@@ -312,7 +340,14 @@
       const taps = names.map((n) => ({ name: n, data: result.outputs[n]!.data }));
       const k = `${caseKey}:${netRung}`;
       await netCall(
-        { type: 'set', key: k, taps, geometry: $state.snapshot(asset.taps) as TapGeom[], gridHu: prep.gridHu.slice(), gridShape: GRID_SHAPE },
+        {
+          type: 'set',
+          key: k,
+          taps,
+          geometry: $state.snapshot(asset.taps) as TapGeom[],
+          gridHu: prep.gridHu.slice(),
+          gridShape: GRID_SHAPE
+        },
         taps.map((x) => x.data.buffer)
       );
       netGeometry = $state.snapshot(asset.taps) as TapGeom[];
@@ -373,7 +408,8 @@
   function setStage(i: number) {
     stageIndex = i;
     // Keep pointing at the same place in the scan when switching stages.
-    if (netMode === 'similarity' && netMm && prep && netGeometry[i]) netCell = cellAt(prep.gridAffine, netGeometry[i]!, netMm);
+    if (netMode === 'similarity' && netMm && prep && netGeometry[i])
+      netCell = cellAt(prep.gridAffine, netGeometry[i]!, netMm);
     showStage();
   }
 
@@ -407,13 +443,17 @@
     const out: File[] = [];
     const walk = async (entry: FileSystemEntry, path: string): Promise<void> => {
       if (entry.isFile) {
-        const file = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej));
+        const file = await new Promise<File>((res, rej) =>
+          (entry as FileSystemFileEntry).file(res, rej)
+        );
         Object.defineProperty(file, '_webkitRelativePath', { value: path + file.name });
         out.push(file);
       } else if (entry.isDirectory) {
         const reader = (entry as FileSystemDirectoryEntry).createReader();
         for (;;) {
-          const batch = await new Promise<FileSystemEntry[]>((res, rej) => reader.readEntries(res, rej));
+          const batch = await new Promise<FileSystemEntry[]>((res, rej) =>
+            reader.readEntries(res, rej)
+          );
           if (!batch.length) break;
           for (const e of batch) await walk(e, `${path}${entry.name}/`);
         }
@@ -441,14 +481,20 @@
         const d = new Dcm2niix();
         await d.init();
         const out = (await d.input(files).run()) as File[];
-        const volumes = out.filter((f) => /\.nii(\.gz)?$/i.test(f.name)).sort((a, b) => b.size - a.size);
+        const volumes = out
+          .filter((f) => /\.nii(\.gz)?$/i.test(f.name))
+          .sort((a, b) => b.size - a.size);
         if (!volumes.length) throw new Error('no CT series could be converted from these files');
         file = volumes[0]!;
         detail = `DICOM, ${volumes.length} series found, largest used`;
       }
       const buffer = await file.arrayBuffer();
       source = { kind: 'own', name: file.name, buffer, detail };
-      background = { key: `own-${file.name}-${file.size}`, name: file.name, buffer: buffer.slice(0) };
+      background = {
+        key: `own-${file.name}-${file.size}`,
+        name: file.name,
+        buffer: buffer.slice(0)
+      };
       return { kind: 'native', buffer: buffer.slice(0), name: file.name };
     });
   }
@@ -482,24 +528,42 @@
   <title>Reading room, MuCoDi Chest CT</title>
 </svelte:head>
 
-<div class="room" ondragover={(e) => { e.preventDefault(); dropActive = true; }} ondragleave={() => (dropActive = false)} ondrop={onDrop} role="presentation">
+<div
+  class="room"
+  ondragover={(e) => {
+    e.preventDefault();
+    dropActive = true;
+  }}
+  ondragleave={() => (dropActive = false)}
+  ondrop={onDrop}
+  role="presentation"
+>
+  <h1 class="visually-hidden">Reading room: encode a chest CT on this CPU</h1>
   <aside class="worklist" aria-label="Worklist">
     <h2 class="label">Worklist</h2>
     {#if loadError}<p class="error">{loadError}</p>{/if}
     <ul>
       {#each cases?.cases ?? [] as c (c.id)}
         <li>
-          <button class="case" class:active={source?.kind === 'case' && source.case.id === c.id} onclick={() => selectCase(c, false)}>
+          <button
+            class="case"
+            class:active={source?.kind === 'case' && source.case.id === c.id}
+            onclick={() => selectCase(c, false)}
+          >
             <span class="cid mono">{c.patient}</span>
             <span class="ctitle">{c.title}</span>
-            <span class="cmeta mono">{c.native_shape_xyz.join(' x ')}, {c.spacing_mm[2]} mm slices</span>
+            <span class="cmeta mono"
+              >{c.native_shape_xyz.join(' x ')}, {c.spacing_mm[2]} mm slices</span
+            >
           </button>
         </li>
       {/each}
     </ul>
     <div class="own" class:drop={dropActive}>
       <h2 class="label">Your own scan</h2>
-      <p class="muted small">Drop a NIfTI file or a DICOM folder here. It is processed in this tab and never uploaded.</p>
+      <p class="muted small">
+        Drop a NIfTI file or a DICOM folder here. It is processed in this tab and never uploaded.
+      </p>
       <label class="pick">
         <input type="file" accept=".nii,.gz,.dcm,application/dicom" multiple onchange={onPick} />
         <span>Choose files</span>
@@ -514,26 +578,44 @@
         <h2 class="label">Input check</h2>
         <dl>
           {#if source?.kind === 'case'}
-            <dt>Source</dt><dd>{source.case.collection}, {source.case.licence}</dd>
-            <dt>Native</dt><dd class="mono">{source.case.native_shape_xyz.join(' x ')}</dd>
-            <dt>Spacing</dt><dd class="mono">{source.case.spacing_mm.map((v) => v.toFixed(2)).join(' x ')} mm</dd>
-            <dt>Extent</dt><dd class="mono">{source.case.extent_mm.map((v) => Math.round(v)).join(' x ')} mm</dd>
+            <dt>Source</dt>
+            <dd>{source.case.collection}, {source.case.licence}</dd>
+            <dt>Native</dt>
+            <dd class="mono">{source.case.native_shape_xyz.join(' x ')}</dd>
+            <dt>Spacing</dt>
+            <dd class="mono">{source.case.spacing_mm.map((v) => v.toFixed(2)).join(' x ')} mm</dd>
+            <dt>Extent</dt>
+            <dd class="mono">{source.case.extent_mm.map((v) => Math.round(v)).join(' x ')} mm</dd>
           {:else if source?.kind === 'own' && prep.native}
-            <dt>Source</dt><dd>{source.detail}</dd>
-            <dt>Native</dt><dd class="mono">{prep.native.shape.join(' x ')} {prep.native.datatype}</dd>
-            <dt>Spacing</dt><dd class="mono">{prep.native.zooms.map((v) => v.toFixed(2)).join(' x ')} mm</dd>
-            <dt>Extent</dt><dd class="mono">{prep.stats.extentMm?.map((v) => Math.round(v)).join(' x ')} mm</dd>
-            <dt>HU range</dt><dd class="mono">{Math.round(prep.stats.minHu)} to {Math.round(prep.stats.maxHu)}</dd>
+            <dt>Source</dt>
+            <dd>{source.detail}</dd>
+            <dt>Native</dt>
+            <dd class="mono">{prep.native.shape.join(' x ')} {prep.native.datatype}</dd>
+            <dt>Spacing</dt>
+            <dd class="mono">{prep.native.zooms.map((v) => v.toFixed(2)).join(' x ')} mm</dd>
+            <dt>Extent</dt>
+            <dd class="mono">{prep.stats.extentMm?.map((v) => Math.round(v)).join(' x ')} mm</dd>
+            <dt>HU range</dt>
+            <dd class="mono">{Math.round(prep.stats.minHu)} to {Math.round(prep.stats.maxHu)}</dd>
           {/if}
-          <dt>Model grid</dt><dd class="mono">{GRID_SHAPE.join(' x ')} (D x H x W)</dd>
-          {#if gridMm}<dt>Grid voxel</dt><dd class="mono">{gridMm.map((v) => v.toFixed(2)).join(' x ')} mm</dd>{/if}
+          <dt>Model grid</dt>
+          <dd class="mono">{GRID_SHAPE.join(' x ')} (D x H x W)</dd>
+          {#if gridMm}<dt>Grid voxel</dt>
+            <dd class="mono">{gridMm.map((v) => v.toFixed(2)).join(' x ')} mm</dd>{/if}
         </dl>
         {#if source?.kind === 'own' && prep.stats.extentMm && prep.stats.extentMm[2] > 450}
-          <p class="warn small">The scan covers more than the thorax. The students were trained on chest CT, so this embedding is outside their training distribution.</p>
+          <p class="warn small">
+            The scan covers more than the thorax. The students were trained on chest CT, so this
+            embedding is outside their training distribution.
+          </p>
         {/if}
         {#if source?.kind === 'case' && source.case.hero}
           <label class="toggle small">
-            <input type="checkbox" checked={source.full} onchange={(e) => heroToggle((e.currentTarget as HTMLInputElement).checked)} />
+            <input
+              type="checkbox"
+              checked={source.full}
+              onchange={(e) => heroToggle((e.currentTarget as HTMLInputElement).checked)}
+            />
             Run the full preprocessing in this tab (34 MB native scan)
           </label>
         {/if}
@@ -546,25 +628,32 @@
       {#if layout === 'render'}
         <div class="group" role="group" aria-label="3D preset">
           {#each PRESETS as p, i (p.cmap)}
-            <button class:on={presetIndex === i} onclick={() => (presetIndex = i)}>{p.label}</button>
+            <button class:on={presetIndex === i} onclick={() => (presetIndex = i)}>{p.label}</button
+            >
           {/each}
         </div>
       {:else}
         <div class="group" role="group" aria-label="Window">
           {#each WINDOWS as w, i (w.name)}
-            <button class:on={windowIndex === i} onclick={() => (windowIndex = i)}>{w.label}</button>
+            <button class:on={windowIndex === i} onclick={() => (windowIndex = i)}>{w.label}</button
+            >
           {/each}
         </div>
       {/if}
       <div class="group" role="group" aria-label="Layout">
         <button class:on={layout === 'grid'} onclick={() => (layout = 'grid')}>2 x 2</button>
         <button class:on={layout === 'axial'} onclick={() => (layout = 'axial')}>Axial</button>
-        <button class:on={layout === 'coronal'} onclick={() => (layout = 'coronal')}>Coronal</button>
+        <button class:on={layout === 'coronal'} onclick={() => (layout = 'coronal')}>Coronal</button
+        >
         <button class:on={layout === 'render'} onclick={() => (layout = 'render')}>3D</button>
       </div>
       <div class="group" role="group" aria-label="Image">
         <button class:on={viewMode === 'ct'} onclick={() => (viewMode = 'ct')}>Scan</button>
-        <button class:on={viewMode === 'model'} disabled={!prep} onclick={() => (viewMode = 'model')}>Model input</button>
+        <button
+          class:on={viewMode === 'model'}
+          disabled={!prep}
+          onclick={() => (viewMode = 'model')}>Model input</button
+        >
       </div>
     </div>
     <div class="canvas">
@@ -580,9 +669,16 @@
       />
     </div>
     <div class="status mono">
-      <span>{#if source?.kind === 'case'}{source.case.patient}, {source.case.collection}{:else if source?.kind === 'own'}{source.name}, local file{/if}</span>
+      <span
+        >{#if source?.kind === 'case'}{source.case.patient}, {source.case
+            .collection}{:else if source?.kind === 'own'}{source.name}, local file{/if}</span
+      >
       <span>{viewMode === 'model' ? 'Model input grid 128 x 256 x 256' : 'Native scan'}</span>
-      <span>{layout === 'render' ? `3D ${PRESETS[presetIndex]!.label}` : `${win.label} W ${win.width} L ${win.center}`}</span>
+      <span
+        >{layout === 'render'
+          ? `3D ${PRESETS[presetIndex]!.label}`
+          : `${win.label} W ${win.width} L ${win.center}`}</span
+      >
       <span class="nd">Not for diagnosis</span>
     </div>
   </section>
@@ -590,12 +686,23 @@
   <aside class="analysis" aria-label="Analysis">
     <section>
       <h2 class="label">Student encoder</h2>
-      {#if rungs.length}<Ladder {rungs} selected={rung} onSelect={(r) => { rung = r; resetRun(); }} />{/if}
+      {#if rungs.length}<Ladder
+          {rungs}
+          selected={rung}
+          onSelect={(r) => {
+            rung = r;
+            resetRun();
+          }}
+        />{/if}
     </section>
     <section>
       <div class="threads" role="group" aria-label="CPU threads">
-        <button class:on={threadsMode === 'one'} onclick={() => setThreads('one')}>1 thread (as in the thesis)</button>
-        <button class:on={threadsMode === 'all'} onclick={() => setThreads('all')}>{cores} threads</button>
+        <button class:on={threadsMode === 'one'} onclick={() => setThreads('one')}
+          >1 thread (as in the thesis)</button
+        >
+        <button class:on={threadsMode === 'all'} onclick={() => setThreads('all')}
+          >{cores} threads</button
+        >
       </div>
       <button class="primary encode" disabled={!prep || running} onclick={encode}>
         {running ? 'Encoding' : 'Encode on this CPU'}
@@ -605,18 +712,34 @@
     </section>
     <section class="clock-block" aria-live="polite">
       <p class="label">Forward pass on this device</p>
-      <p class="clock num">{forwardMs !== null ? (forwardMs / 1000).toFixed(2) : '0.00'}<span class="unit"> s</span></p>
-      {#if hiddenRun}<p class="warn small">This tab was in the background, which browsers slow down. Keep it in front for a comparable time.</p>{/if}
+      <p class="clock num">
+        {forwardMs !== null ? (forwardMs / 1000).toFixed(2) : '0.00'}<span class="unit"> s</span>
+      </p>
+      {#if hiddenRun}<p class="warn small">
+          This tab was in the background, which browsers slow down. Keep it in front for a
+          comparable time.
+        </p>{/if}
       {#if forwardMs !== null && projected && p0 && c1}
         <table class="compare">
           <tbody>
-            <tr><td>{rungs.find((r) => r.rung === rung)?.label}, this device</td><td class="num">{formatSeconds(forwardMs)}</td></tr>
-            <tr class="proj"><td>Pillar-0, projected</td><td class="num">{formatSeconds(projected.p0.ms)}</td></tr>
-            <tr class="proj"><td>Curia-1, projected</td><td class="num">{formatSeconds(projected.c1.ms)}</td></tr>
+            <tr
+              ><td>{rungs.find((r) => r.rung === rung)?.label}, this device</td><td class="num"
+                >{formatSeconds(forwardMs)}</td
+              ></tr
+            >
+            <tr class="proj"
+              ><td>Pillar-0, projected</td><td class="num">{formatSeconds(projected.p0.ms)}</td></tr
+            >
+            <tr class="proj"
+              ><td>Curia-1, projected</td><td class="num">{formatSeconds(projected.c1.ms)}</td></tr
+            >
           </tbody>
         </table>
         <p class="muted small">
-          Teachers are not run here. Their single-thread time from thesis Table 6.5 (Pillar-0 {formatSeconds(p0.cpu_median_ms ?? 0)}, Curia-1 {formatSeconds(c1.cpu_median_ms ?? 0)}) is scaled by this device's speed on {factor?.n ?? 0} measured student{factor?.n === 1 ? '' : 's'}. <a href="race">Race them</a>.
+          Teachers are not run here. Their single-thread time from thesis Table 6.5 (Pillar-0 {formatSeconds(
+            p0.cpu_median_ms ?? 0
+          )}, Curia-1 {formatSeconds(c1.cpu_median_ms ?? 0)}) is scaled by this device's speed on {factor?.n ??
+            0} measured student{factor?.n === 1 ? '' : 's'}. <a href="race">Race them</a>.
         </p>
       {/if}
     </section>
@@ -630,31 +753,48 @@
         <EmbeddingStrip values={embedding} />
         {#if goldenCos !== null}
           <p class="small">
-            Matches the thesis pipeline in PyTorch: cosine <span class="num">{goldenCos.toFixed(6)}</span>
+            Matches the thesis pipeline in PyTorch: cosine <span class="num"
+              >{goldenCos.toFixed(6)}</span
+            >
           </p>
         {/if}
         <p class="muted small">
-          This vector is what the model outputs. It is not a finding. In the thesis, probes trained on labelled cohorts read it out; see the evidence.
+          This vector is what the model outputs. It is not a finding. In the thesis, probes trained
+          on labelled cohorts read it out; see the evidence.
         </p>
       </section>
     {/if}
     <section class="network">
       <h2 class="label">Network view</h2>
       <p class="muted small">
-        How the network represents this scan, stage by stage, on each stage's own grid. Not an explanation of any prediction.
+        How the network represents this scan, stage by stage, on each stage's own grid. Not an
+        explanation of any prediction.
       </p>
       <div class="netrow" role="group" aria-label="Network view model">
         {#each TAPS_RUNGS as r (r)}
-          <button class:on={netRung === r} disabled={!!netBusy} onclick={() => { netRung = r; resetNetwork(); }}>{rungs.find((x) => x.rung === r)?.label ?? r}</button>
+          <button
+            class:on={netRung === r}
+            disabled={!!netBusy}
+            onclick={() => {
+              netRung = r;
+              resetNetwork();
+            }}>{rungs.find((x) => x.rung === r)?.label ?? r}</button
+          >
         {/each}
-        <button class="primary" disabled={!prep || !!netBusy} onclick={computeNetwork}>{netKey ? 'Recompute' : 'Compute stage maps'}</button>
+        <button class="primary" disabled={!prep || !!netBusy} onclick={computeNetwork}
+          >{netKey ? 'Recompute' : 'Compute stage maps'}</button
+        >
       </div>
       {#if netBusy}<p class="small">{netBusy}</p>{/if}
       {#if netError}<p class="error">{netError}</p>{/if}
       {#if netKey && stage}
         <div class="netrow stages" role="group" aria-label="Stage">
           {#each netGeometry as g, i (g.name)}
-            <button class:on={stageIndex === i} onclick={() => setStage(i)} title={`${g.name}: ${g.shape.slice(1).join(' x ')} cells`}>{STAGE_LABELS[i]}</button>
+            <button
+              class:on={stageIndex === i}
+              onclick={() => setStage(i)}
+              title={`${g.name}: ${g.shape.slice(1).join(' x ')} cells`}>{STAGE_LABELS[i]}</button
+            >
           {/each}
         </div>
         <p class="small mono stageinfo">
@@ -662,35 +802,55 @@
           one cell per {stage.stride[0]} input voxels per axis, local receptive field {stage.rf[0]} voxels
         </p>
         <div class="netrow" role="group" aria-label="Overlay">
-          <button class:on={netMode === 'pca'} onclick={() => setNetMode('pca')}>Principal components</button>
-          <button class:on={netMode === 'similarity'} onclick={() => setNetMode('similarity')}>Similarity to a cell</button>
+          <button class:on={netMode === 'pca'} onclick={() => setNetMode('pca')}
+            >Principal components</button
+          >
+          <button class:on={netMode === 'similarity'} onclick={() => setNetMode('similarity')}
+            >Similarity to a cell</button
+          >
         </div>
         {#if netMode === 'pca' && netExplained}
           <p class="small">
-            Red, green and blue are the first three principal components of the cells inside the body; together they carry
-            <span class="num">{fmtPct(netExplained[0] + netExplained[1] + netExplained[2])}</span> of the variance
-            ({fmtPct(netExplained[0])}, {fmtPct(netExplained[1])}, {fmtPct(netExplained[2])}).
+            Red, green and blue are the first three principal components of the cells inside the
+            body; together they carry
+            <span class="num">{fmtPct(netExplained[0] + netExplained[1] + netExplained[2])}</span>
+            of the variance ({fmtPct(netExplained[0])}, {fmtPct(netExplained[1])}, {fmtPct(
+              netExplained[2]
+            )}).
           </p>
         {:else if netMode === 'similarity'}
           {#if netCell && netBest}
             <p class="small">
-              Cell <span class="mono">{netCell.join(', ')}</span>: cosine similarity of every cell's feature vector to the clicked cell, shown from
+              Cell <span class="mono">{netCell.join(', ')}</span>: cosine similarity of every cell's
+              feature vector to the clicked cell, shown from
               <span class="num">{simMin.toFixed(2)}</span> to 1.
             </p>
-            <label class="small slider">Show from
-              <input type="range" min="0" max="0.95" step="0.05" bind:value={simMin} onchange={showStage} />
+            <label class="small slider"
+              >Show from
+              <input
+                type="range"
+                min="0"
+                max="0.95"
+                step="0.05"
+                bind:value={simMin}
+                onchange={showStage}
+              />
             </label>
           {:else}
             <p class="small">Click a point in the scan to compare every cell with it.</p>
           {/if}
         {/if}
-        <label class="small slider">Opacity
+        <label class="small slider"
+          >Opacity
           <input type="range" min="0.1" max="1" step="0.05" bind:value={netOpacity} />
         </label>
-        <label class="small toggle"><input type="checkbox" bind:checked={blocks} /> Show cells as blocks (no smoothing)</label>
+        <label class="small toggle"
+          ><input type="checkbox" bind:checked={blocks} /> Show cells as blocks (no smoothing)</label
+        >
         <p class="muted small">
-          Each stage also receives squeeze-excitation gates pooled over the whole scan, so strictly every cell depends on the whole volume;
-          the receptive field above is the convolutional one.
+          Each stage also receives squeeze-excitation gates pooled over the whole scan, so strictly
+          every cell depends on the whole volume; the receptive field above is the convolutional
+          one.
         </p>
       {/if}
     </section>
@@ -888,7 +1048,6 @@
     position: relative;
     min-height: 0;
   }
-
 
   .threads {
     display: flex;

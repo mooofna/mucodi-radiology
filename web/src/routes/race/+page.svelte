@@ -5,7 +5,13 @@
   import { prepare } from '#lib/volume/prep.ts';
   import { GRID_SHAPE } from '#lib/volume/grid.ts';
   import { assetUrl, loadCases, loadModels, type ModelsManifest } from '#lib/data/manifest.ts';
-  import { byLabel, loadInference, loadLadder, type Inference, type LadderRung } from '#lib/data/evidence.ts';
+  import {
+    byLabel,
+    loadInference,
+    loadLadder,
+    type Inference,
+    type LadderRung
+  } from '#lib/data/evidence.ts';
   import {
     deviceFactor,
     formatSeconds,
@@ -57,7 +63,9 @@
     const tmin = lanes.find((l) => l.rung === 'tmin');
     if (tmin?.latencies.length) {
       return {
-        f: deviceFactor([{ rung: 'tmin', liveMs: tmin.latencies[0]!, thesisMs: thesisMs('tmin') }])!,
+        f: deviceFactor([
+          { rung: 'tmin', liveMs: tmin.latencies[0]!, thesisMs: thesisMs('tmin') }
+        ])!,
         provisional: true
       };
     }
@@ -99,7 +107,12 @@
     l.lane = lane;
     l.state = 'loading';
     const f = files(l.rung);
-    await lane.load(`${l.rung}.core`, f.url, f.external, (done, total) => (l.progress = `${Math.round((100 * done) / (total || 1))} %`));
+    await lane.load(
+      `${l.rung}.core`,
+      f.url,
+      f.external,
+      (done, total) => (l.progress = `${Math.round((100 * done) / (total || 1))} %`)
+    );
     await lane.setInput('input', input!, [1, 4, ...GRID_SHAPE]);
     l.state = 'warming';
     await lane.run(`${l.rung}.core`, 'input', { warmup: 0, iters: 1 });
@@ -162,7 +175,8 @@
     for (const l of lanes) {
       l.lane?.terminate();
       l.lane = null;
-      if (l.state === 'running' || l.state === 'loading' || l.state === 'warming') l.state = 'stopped';
+      if (l.state === 'running' || l.state === 'loading' || l.state === 'warming')
+        l.state = 'stopped';
     }
   }
 
@@ -172,7 +186,18 @@
     if (!input || !models || benchRunning) return;
     stop();
     benchRunning = true;
-    const order = ['tmin', 't0', 't1', 't2', 't3', 't4', 't5', 't6', 'b0', ...(includeLarge ? ['b2', 'b3', 'b4', 'b5', 'b6'] : [])];
+    const order = [
+      'tmin',
+      't0',
+      't1',
+      't2',
+      't3',
+      't4',
+      't5',
+      't6',
+      'b0',
+      ...(includeLarge ? ['b2', 'b3', 'b4', 'b5', 'b6'] : [])
+    ];
     try {
       for (const rung of order) {
         if (!models.rungs.some((m) => m.rung === rung)) continue;
@@ -186,10 +211,15 @@
           const hiddenBefore = document.visibilityState === 'hidden';
           const r = await lane.run(`${rung}.core`, 'input', { warmup: 1, iters: 5 });
           if (hiddenBefore || document.visibilityState === 'hidden') {
-            benchStatus = 'Paused: the tab went to the background, which browsers slow down. Bring it to the front and run again.';
+            benchStatus =
+              'Paused: the tab went to the background, which browsers slow down. Bring it to the front and run again.';
             break;
           }
-          measurements = saveMeasurement({ rung, liveMs: median(r.times), thesisMs: thesisMs(rung) });
+          measurements = saveMeasurement({
+            rung,
+            liveMs: median(r.times),
+            thesisMs: thesisMs(rung)
+          });
         } finally {
           lane.terminate();
         }
@@ -222,10 +252,33 @@
       x: { type: 'log', label: 'Thesis Xeon Silver 4214R, 1 thread (s)', domain: [lo, hi] },
       y: { type: 'log', label: 'This device, 1 thread (s)', domain: [lo, hi] },
       marks: [
-        P.line([[lo, lo], [hi, hi]], { stroke: 'currentColor', strokeOpacity: 0.35, strokeDasharray: '3,3' }),
-        P.line([[lo, lo * f], [hi, hi * f]], { stroke: 'var(--accent)' }),
-        P.dot(benchRows, { x: (d) => d.thesisMs / 1000, y: (d) => d.liveMs / 1000, fill: 'currentColor', r: 3 }),
-        P.text(benchRows, { x: (d) => d.thesisMs / 1000, y: (d) => d.liveMs / 1000, text: 'label', dx: 8, textAnchor: 'start' })
+        P.line(
+          [
+            [lo, lo],
+            [hi, hi]
+          ],
+          { stroke: 'currentColor', strokeOpacity: 0.35, strokeDasharray: '3,3' }
+        ),
+        P.line(
+          [
+            [lo, lo * f],
+            [hi, hi * f]
+          ],
+          { stroke: 'var(--accent)' }
+        ),
+        P.dot(benchRows, {
+          x: (d) => d.thesisMs / 1000,
+          y: (d) => d.liveMs / 1000,
+          fill: 'currentColor',
+          r: 3
+        }),
+        P.text(benchRows, {
+          x: (d) => d.thesisMs / 1000,
+          y: (d) => d.liveMs / 1000,
+          text: 'label',
+          dx: 8,
+          textAnchor: 'start'
+        })
       ]
     });
   }
@@ -239,7 +292,13 @@
 
 <svg width="0" height="0" style="position: absolute" aria-hidden="true">
   <defs>
-    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <pattern
+      id="hatch"
+      width="6"
+      height="6"
+      patternUnits="userSpaceOnUse"
+      patternTransform="rotate(45)"
+    >
       <line x1="0" y1="0" x2="0" y2="6" stroke="#4477aa" stroke-width="2" />
     </pattern>
   </defs>
@@ -264,11 +323,15 @@
       <span class="label">Challenger</span>
       <select bind:value={challenger} disabled={racing}>
         {#each ladder.filter((l) => l.rung !== 'tmin' && l.params_m < 13) as l (l.rung)}
-          <option value={l.rung}>{l.label}, {l.params_m < 1 ? `${(l.params_m * 1000).toFixed(0)} k` : `${l.params_m} M`} parameters</option>
+          <option value={l.rung}
+            >{l.label}, {l.params_m < 1 ? `${(l.params_m * 1000).toFixed(0)} k` : `${l.params_m} M`} parameters</option
+          >
         {/each}
       </select>
     </label>
-    <p class="muted small">Scan: {caseLabel || 'loading'}. Each student runs in its own worker on one thread.</p>
+    <p class="muted small">
+      Scan: {caseLabel || 'loading'}. Each student runs in its own worker on one thread.
+    </p>
     {#if racing}
       <button onclick={stop}>Stop</button>
     {:else}
@@ -277,7 +340,9 @@
   </section>
 
   <section class="board" aria-label="Race">
-    <p class="clock num" aria-hidden="true">{(elapsed / 1000).toFixed(1)}<span class="unit"> s</span></p>
+    <p class="clock num" aria-hidden="true">
+      {(elapsed / 1000).toFixed(1)}<span class="unit"> s</span>
+    </p>
     <div class="lanes">
       {#each lanes as l (l.rung)}
         <div class="lane">
@@ -291,7 +356,8 @@
             {/each}
           </div>
           <div class="count num">
-            {#if l.state === 'loading'}loading {l.progress}{:else if l.state === 'warming'}warming up{:else if l.state === 'failed'}failed{:else}{l.completions.length} scans{/if}
+            {#if l.state === 'loading'}loading {l.progress}{:else if l.state === 'warming'}warming
+              up{:else if l.state === 'failed'}failed{:else}{l.completions.length} scans{/if}
           </div>
         </div>
       {/each}
@@ -304,14 +370,23 @@
             </div>
             <div class="track">
               {#if t.p}
-                <svg class="hatch" style={`width: ${Math.min(100, (Math.min(elapsed, t.p.ms) / axisMs) * 100)}%`} aria-hidden="true">
+                <svg
+                  class="hatch"
+                  style={`width: ${Math.min(100, (Math.min(elapsed, t.p.ms) / axisMs) * 100)}%`}
+                  aria-hidden="true"
+                >
                   <rect width="100%" height="100%" fill="url(#hatch)" />
                 </svg>
-                {#if t.p.ms <= axisMs}<span class="finish" style={`left: ${(t.p.ms / axisMs) * 100}%`}></span>{/if}
+                {#if t.p.ms <= axisMs}<span
+                    class="finish"
+                    style={`left: ${(t.p.ms / axisMs) * 100}%`}
+                  ></span>{/if}
               {/if}
             </div>
             <div class="count num">
-              {#if t.p}{elapsed >= t.p.ms ? '1 scan' : `${Math.round((100 * elapsed) / t.p.ms)} %`}{:else}waiting{/if}
+              {#if t.p}{elapsed >= t.p.ms
+                  ? '1 scan'
+                  : `${Math.round((100 * elapsed) / t.p.ms)} %`}{:else}waiting{/if}
             </div>
           </div>
         {/each}
@@ -319,25 +394,31 @@
     </div>
 
     {#if hiddenDuring}
-      <p class="warn small">The tab was in the background during this race. Browsers slow background tabs down, so these counts are lower than this device can do.</p>
+      <p class="warn small">
+        The tab was in the background during this race. Browsers slow background tabs down, so these
+        counts are lower than this device can do.
+      </p>
     {/if}
     {#if p0Done && p0 && lanes.length}
       <p class="verdict" aria-live="polite">
         In the time Pillar-0 would need for one scan on this CPU (about {formatSeconds(p0.ms)}),
-        {#each lanes as l, i (l.rung)}{i > 0 ? ' and ' : ''}{l.label} encoded <span class="num">{countAt(l, p0.ms)}</span>{/each}.
+        {#each lanes as l, i (l.rung)}{i > 0 ? ' and ' : ''}{l.label} encoded
+          <span class="num">{countAt(l, p0.ms)}</span>{/each}.
       </p>
     {/if}
 
     {#if factor}
       <p class="muted small">
         Projection: thesis single-thread time times this device's factor
-        <span class="num">{factor.f.factor.toFixed(2)}</span>, the ratio of TMIN's time here to its thesis time, so the
-        projected Pillar-0 to TMIN ratio is the thesis's {tmin?.cpu_speedup_vs_pillar0?.toFixed(1)} by construction and your
-        device sets the time scale.{#if factor.f.n > 1}
+        <span class="num">{factor.f.factor.toFixed(2)}</span>, the ratio of TMIN's time here to its
+        thesis time, so the projected Pillar-0 to TMIN ratio is the thesis's {tmin?.cpu_speedup_vs_pillar0?.toFixed(
+          1
+        )} by construction and your device sets the time scale.{#if factor.f.n > 1}
           Other students ran at ratios from <span class="num">{factor.f.min.toFixed(2)}</span> to
           <span class="num">{factor.f.max.toFixed(2)}</span>, which would put Pillar-0 between
           {formatSeconds(p0Ms * factor.f.min)} and {formatSeconds(p0Ms * factor.f.max)}.{/if}
-        {#if factor.provisional}Provisional: estimated from the first TMIN pass of this race; the benchmark below measures each student alone.{/if}
+        {#if factor.provisional}Provisional: estimated from the first TMIN pass of this race; the
+          benchmark below measures each student alone.{/if}
         Students racing side by side share memory bandwidth, so their live counts are, if anything, conservative.
       </p>
     {/if}
@@ -350,35 +431,59 @@
     </div>
     <div class="section-body">
       <p>
-        Each student runs alone in a fresh worker on one thread: one warm-up, then the median of five forward passes
-        on the same scan, as in the thesis. The ratio to the thesis Xeon times is this device's factor.
+        Each student runs alone in a fresh worker on one thread: one warm-up, then the median of
+        five forward passes on the same scan, as in the thesis. The ratio to the thesis Xeon times
+        is this device's factor.
       </p>
       <div class="benchctl">
         <button class="primary" disabled={!input || benchRunning || racing} onclick={benchmark}>
           {benchRunning ? 'Measuring' : 'Run the benchmark'}
         </button>
-        <label class="small"><input type="checkbox" bind:checked={includeLarge} disabled={benchRunning} /> Include B2 to B6 (about 600 MB of models)</label>
+        <label class="small"
+          ><input type="checkbox" bind:checked={includeLarge} disabled={benchRunning} /> Include B2 to
+          B6 (about 600 MB of models)</label
+        >
         <span class="muted small">{benchStatus}</span>
       </div>
       {#if benchRows.length}
-        <Plot make={chart} label="Single-thread encode time per student: this device against the thesis Xeon" />
+        <Plot
+          make={chart}
+          label="Single-thread encode time per student: this device against the thesis Xeon"
+        />
         <table>
           <thead>
-            <tr><th>Student</th><th class="num">Thesis Xeon (s)</th><th class="num">This device (s)</th><th class="num">Ratio</th></tr>
+            <tr
+              ><th>Student</th><th class="num">Thesis Xeon (s)</th><th class="num"
+                >This device (s)</th
+              ><th class="num">Ratio</th></tr
+            >
           </thead>
           <tbody>
             {#each benchRows as r (r.rung)}
-              <tr><td>{r.label}</td><td class="num">{(r.thesisMs / 1000).toFixed(2)}</td><td class="num">{(r.liveMs / 1000).toFixed(2)}</td><td class="num">{r.ratio.toFixed(2)}</td></tr>
+              <tr
+                ><td>{r.label}</td><td class="num">{(r.thesisMs / 1000).toFixed(2)}</td><td
+                  class="num">{(r.liveMs / 1000).toFixed(2)}</td
+                ><td class="num">{r.ratio.toFixed(2)}</td></tr
+              >
             {/each}
             {#if p0 && c1}
-              <tr class="proj"><td>Pillar-0, projected</td><td class="num">{(p0Ms / 1000).toFixed(2)}</td><td class="num">{(p0.ms / 1000).toFixed(1)}</td><td></td></tr>
-              <tr class="proj"><td>Curia-1, projected</td><td class="num">{(c1Ms / 1000).toFixed(2)}</td><td class="num">{(c1.ms / 1000).toFixed(1)}</td><td></td></tr>
+              <tr class="proj"
+                ><td>Pillar-0, projected</td><td class="num">{(p0Ms / 1000).toFixed(2)}</td><td
+                  class="num">{(p0.ms / 1000).toFixed(1)}</td
+                ><td></td></tr
+              >
+              <tr class="proj"
+                ><td>Curia-1, projected</td><td class="num">{(c1Ms / 1000).toFixed(2)}</td><td
+                  class="num">{(c1.ms / 1000).toFixed(1)}</td
+                ><td></td></tr
+              >
             {/if}
           </tbody>
         </table>
         <p class="muted small">
-          Thesis: Intel Xeon Silver 4214R, PyTorch 2.11, fp32, one pinned thread (Table 6.5). Here: ONNX Runtime Web 1.30
-          (WebAssembly with SIMD), fp32, one thread. Measurements stay in this browser.
+          Thesis: Intel Xeon Silver 4214R, PyTorch 2.11, fp32, one pinned thread (Table 6.5). Here:
+          ONNX Runtime Web 1.30 (WebAssembly with SIMD), fp32, one thread. Measurements stay in this
+          browser.
         </p>
       {/if}
     </div>
@@ -390,10 +495,11 @@
       <div class="section-body">
         <p>
           On a GPU the gap closes. On an A100 at batch size 1 the smallest student is
-          <span class="num">{tmin.gpu_b1_speedup_vs_pillar0}</span> times faster than Pillar-0, against
-          <span class="num">{tmin.cpu_speedup_vs_pillar0?.toFixed(1)}</span> times on one CPU thread (Table 6.5). The thesis
-          reads this as the GPU forward pass being bound by memory bandwidth, so there the parameter cut surfaces as
-          reduced memory rather than lower latency.
+          <span class="num">{tmin.gpu_b1_speedup_vs_pillar0}</span> times faster than Pillar-0,
+          against
+          <span class="num">{tmin.cpu_speedup_vs_pillar0?.toFixed(1)}</span> times on one CPU thread (Table
+          6.5). The thesis reads this as the GPU forward pass being bound by memory bandwidth, so there
+          the parameter cut surfaces as reduced memory rather than lower latency.
         </p>
       </div>
     </section>
@@ -473,7 +579,7 @@
   }
 
   .projected .name {
-    color: var(--c-pillar0);
+    color: var(--c-pillar0-text);
   }
 
   .track {

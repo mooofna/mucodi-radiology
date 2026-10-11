@@ -18,6 +18,8 @@
   import { onDestroy, onMount } from 'svelte';
   import type { Niivue, NVImage } from '@niivue/niivue';
 
+  type ColorMap = Parameters<Niivue['addColormap']>[1];
+
   interface Props {
     background: Layer | null;
     overlays?: Layer[];
@@ -27,7 +29,11 @@
     layout?: Layout;
     nearest?: boolean;
     label?: string;
-    onLocation?: (mm: [number, number, number], vox: [number, number, number], values: number[]) => void;
+    onLocation?: (
+      mm: [number, number, number],
+      vox: [number, number, number],
+      values: number[]
+    ) => void;
   }
 
   let {
@@ -51,7 +57,10 @@
 
   async function toImage(layer: Layer): Promise<NVImage> {
     const { NVImage } = mod!;
-    const name = layer.name.endsWith('.nii') || layer.name.endsWith('.nii.gz') ? layer.name : `${layer.name}.nii`;
+    const name =
+      layer.name.endsWith('.nii') || layer.name.endsWith('.nii.gz')
+        ? layer.name
+        : `${layer.name}.nii`;
     const image = await NVImage.loadFromUrl({
       url: layer.url ?? name,
       name,
@@ -91,10 +100,23 @@
         loadedOverlays = ovKeys;
       }
       applyWindow();
+      followCrosshair(); // loading volumes resets the clip plane
       status = '';
     } catch (err) {
       status = err instanceof Error ? err.message : String(err);
     }
+  }
+
+  // Slices use only the colour of a lookup table; the volume render also uses its alpha. This ramp
+  // has the colour of NiiVue's 'gray' but keeps air and lung (below -500 HU) transparent in 3D, so
+  // the render tile of the 2 x 2 layout shows the body rather than a field of view full of fog.
+  const RENDER_CUTOFF_HU = -500;
+
+  function windowColormap(lo: number, hi: number): { key: string; cmap: ColorMap } {
+    const c = Math.round(Math.min(254, Math.max(0, ((RENDER_CUTOFF_HU - lo) / (hi - lo)) * 255)));
+    const ramp = c > 0 ? [0, c, 255] : [0, 255];
+    const alpha = c > 0 ? [0, 0, 128] : [0, 128];
+    return { key: `mucodi-gray-${c}`, cmap: { R: ramp, G: ramp, B: ramp, A: alpha, I: ramp } };
   }
 
   function applyWindow() {
@@ -106,9 +128,15 @@
       base.cal_min = cm.min ?? base.cal_min;
       base.cal_max = cm.max ?? base.cal_max;
     } else {
-      if (base.colormap !== 'gray') nv.setColormap(base.id, 'gray');
-      base.cal_min = win.center - win.width / 2;
-      base.cal_max = win.center + win.width / 2;
+      const lo = win.center - win.width / 2;
+      const hi = win.center + win.width / 2;
+      const { key, cmap } = windowColormap(lo, hi);
+      if (base.colormap !== key) {
+        nv.addColormap(key, cmap);
+        nv.setColormap(base.id, key);
+      }
+      base.cal_min = lo;
+      base.cal_max = hi;
     }
     nv.updateGLVolume();
   }
@@ -124,6 +152,15 @@
       render: SLICE_TYPE.RENDER
     };
     nv.setSliceType(map[layout]);
+    followCrosshair();
+  }
+
+  // In the 2 x 2 layout the render tile is cut along the coronal plane through the crosshair: it
+  // shows the coronal tile's slice with the anatomy behind it in depth. The full 3D view is uncut.
+  function followCrosshair() {
+    if (!nv) return;
+    if (layout === 'grid') nv.setClipPlane([nv.scene.crosshairPos[1]! - 0.5, 180, 0]);
+    else nv.setClipPlane([2, 0, 0]);
   }
 
   onMount(() => {
@@ -147,6 +184,7 @@
         multiplanarLayout: MULTIPLANAR_TYPE.GRID,
         multiplanarShowRender: SHOW_RENDER.ALWAYS,
         multiplanarPadPixels: 4,
+        isClipAllVolumes: true, // the 3D cut also opens the network-view overlays
         sliceType: SLICE_TYPE.MULTIPLANAR,
         dragAndDropEnabled: false,
         isNearestInterpolation: nearest,
@@ -155,12 +193,25 @@
       });
       await nv.attachToCanvas(canvas);
       const report = (data: unknown) => {
-        const d = data as { mm?: ArrayLike<number>; vox?: ArrayLike<number>; values?: { value: number }[] };
+        const d = data as {
+          mm?: ArrayLike<number>;
+          vox?: ArrayLike<number>;
+          values?: { value: number }[];
+        };
         if (!onLocation || !d?.mm) return;
         const vox = d.vox ?? [0, 0, 0];
-        onLocation([d.mm[0]!, d.mm[1]!, d.mm[2]!], [vox[0]!, vox[1]!, vox[2]!], (d.values ?? []).map((v) => v.value));
+        onLocation(
+          [d.mm[0]!, d.mm[1]!, d.mm[2]!],
+          [vox[0]!, vox[1]!, vox[2]!],
+          (d.values ?? []).map((v) => v.value)
+        );
       };
-      nv.addEventListener('locationChange', (event) => report((event as CustomEvent).detail));
+      nv.addEventListener('locationChange', (event) => {
+        report((event as CustomEvent).detail);
+        followCrosshair();
+      });
+      nv.setClipPlaneColor([0, 0, 0, 0]);
+      nv.setRenderAzimuthElevation(150, 15);
       if (import.meta.env.DEV) (window as unknown as { __nv?: Niivue }).__nv = nv;
       applyLayout();
       await sync();

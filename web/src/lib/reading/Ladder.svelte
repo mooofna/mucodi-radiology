@@ -22,8 +22,10 @@
   const hi = Math.log10(90);
   const x = (p: number) => ((Math.log10(p) - lo) / (hi - lo)) * 100;
   const current = $derived(rungs.find((r) => r.rung === selected));
-  const fmtParams = (p: number) => (p < 1 ? `${(p * 1000).toFixed(p < 0.1 ? 1 : 0)} k` : `${p.toFixed(p < 10 ? 2 : 1)} M`);
-  const fmtBytes = (b: number) => (b < 1e6 ? `${(b / 1e3).toFixed(0)} kB` : `${(b / 1e6).toFixed(b < 1e7 ? 1 : 0)} MB`);
+  const fmtParams = (p: number) =>
+    p < 1 ? `${(p * 1000).toFixed(p < 0.1 ? 1 : 0)} k` : `${p.toFixed(p < 10 ? 2 : 1)} M`;
+  const fmtBytes = (b: number) =>
+    b < 1e6 ? `${(b / 1e3).toFixed(0)} kB` : `${(b / 1e6).toFixed(b < 1e7 ? 1 : 0)} MB`;
 
   function key(event: KeyboardEvent) {
     const i = rungs.findIndex((r) => r.rung === selected);
@@ -59,14 +61,27 @@
     <span class="tick" style={`left: ${x(0.1)}%`}>100 k</span>
     <span class="tick" style={`left: ${x(1)}%`}>1 M</span>
     <span class="tick" style={`left: ${x(10)}%`}>10 M</span>
-    <span class="teacher-mark" style={`left: ${x(79)}%`} title="Pillar-0, the main teacher: 79 M parameters"></span>
+    <span
+      class="teacher-mark"
+      style={`left: ${x(79)}%`}
+      title="Pillar-0, the main teacher: 79 M parameters"
+    ></span>
     <span class="teacher-label">Pillar-0 79 M</span>
   </div>
   {#if current}
     <dl class="facts">
-      <div><dt>Model</dt><dd class="mono">{current.label}</dd></div>
-      <div><dt>Parameters</dt><dd class="num">{fmtParams(current.params_m)}</dd></div>
-      <div><dt>File</dt><dd class="num">{current.bytes ? fmtBytes(current.bytes) : 'n/a'}</dd></div>
+      <div>
+        <dt>Model</dt>
+        <dd class="mono">{current.label}</dd>
+      </div>
+      <div>
+        <dt>Parameters</dt>
+        <dd class="num">{fmtParams(current.params_m)}</dd>
+      </div>
+      <div>
+        <dt>File</dt>
+        <dd class="num">{current.bytes ? fmtBytes(current.bytes) : 'n/a'}</dd>
+      </div>
       <div>
         <dt>Thesis CPU</dt>
         <dd class="num">{current.cpu_ms ? `${(current.cpu_ms / 1000).toFixed(2)} s` : 'n/a'}</dd>
@@ -149,7 +164,7 @@
     top: -12px;
     font-family: var(--font-mono);
     font-size: 0.68rem;
-    color: var(--c-pillar0);
+    color: var(--c-pillar0-text);
   }
 
   .facts {

@@ -62,6 +62,8 @@
   --c-mlp: #2e7d32;
   --c-linear: #cc4444;
   --c-floor: #888888;
+  /* Text in a teacher's colour: the palette value where it reaches 4.5:1, a tint where it does not. */
+  --c-pillar0-text: light-dark(#4477aa, #7aa5d6);
 }
 
 :root[data-theme='light'] {

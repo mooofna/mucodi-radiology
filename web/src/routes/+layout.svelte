@@ -128,7 +128,25 @@
     background: var(--bg-sunk);
   }
 
+  /* Phones: brand and theme toggle on the first row, all five pages on the second. */
   @media (max-width: 760px) {
+    .bar {
+      flex-wrap: wrap;
+      height: auto;
+      column-gap: var(--space-2);
+      padding-top: 0.45rem;
+    }
+
+    nav {
+      order: 3;
+      width: 100%;
+      gap: 0.9rem;
+    }
+
+    nav a {
+      padding: 0.45rem 0 0.4rem;
+    }
+
     .tag,
     .ext {
       display: none;
