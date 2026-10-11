@@ -7,21 +7,23 @@
   let { children } = $props();
 
   const links = [
-    { href: resolve('/'), route: '/', label: 'Reading room' },
+    { href: resolve('/reading-room'), route: '/reading-room', label: 'Reading room' },
     { href: resolve('/race'), route: '/race', label: 'CPU race' },
-    { href: resolve('/evidence'), route: '/evidence', label: 'Evidence' },
+    { href: resolve('/results'), route: '/results', label: 'Results' },
     { href: resolve('/method'), route: '/method', label: 'Method' },
     { href: resolve('/about'), route: '/about', label: 'About' }
   ];
 
   const current = (route: string) => page.route.id === route;
+  // The reading room fills the window like a workstation; a footer would push the viewer down.
+  const workspace = $derived(page.route.id === '/reading-room');
 </script>
 
 <svelte:head>
   <title>MuCoDi Chest CT</title>
   <meta
     name="description"
-    content="Distilled chest CT encoders running on your own CPU, in the browser. Research demo of a bachelor thesis on the parameter-performance trade-off of radiology foundation models."
+    content="Compact chest CT encoders, distilled from radiology foundation models, running in the browser on your own CPU. Research demo of a bachelor thesis on the parameter-performance trade-off of radiology foundation models."
   />
 </svelte:head>
 
@@ -36,18 +38,42 @@
     {/each}
   </nav>
   <div class="tools">
-    <a class="ext" href="https://github.com/mooofna/mucodi-radiology">Code</a>
+    <a class="author" href="https://mooofna.github.io/">Maurice Heide</a>
+    <a
+      class="icon"
+      href="https://github.com/mooofna/mucodi-radiology"
+      aria-label="Source code on GitHub"
+    >
+      <svg viewBox="0 0 16 16" width="17" height="17" aria-hidden="true"
+        ><path
+          fill="currentColor"
+          d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+        /></svg
+      >
+    </a>
     <ThemeToggle />
   </div>
 </header>
-<p class="notice" role="note">
-  Research demo. Not a medical device. Not for diagnosis or any clinical decision. Scans you open
-  stay on this device.
-</p>
 
-<main>
+<main class:workspace>
   {@render children()}
 </main>
+
+{#if !workspace}
+  <footer class="foot">
+    <div class="foot-inner">
+      <p>
+        Research demo for the bachelor thesis <i
+          >On the Parameter-Performance Trade-Off of Radiology Foundation Models</i
+        >, TU Dresden, 2026. Not a medical device and not for diagnosis or any clinical decision.
+      </p>
+      <p class="foot-links">
+        <a href={resolve('/about')}>About, licences and citation</a>
+        <a href="https://github.com/mooofna/mucodi-radiology">Source code</a>
+      </p>
+    </div>
+  </footer>
+{/if}
 
 <style>
   .bar {
@@ -56,8 +82,8 @@
     z-index: 30;
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    height: 44px;
+    gap: var(--space-4);
+    height: var(--bar-height);
     padding: 0 var(--gutter);
     background: var(--bar);
     color: var(--bar-ink);
@@ -74,35 +100,34 @@
 
   .name {
     font-weight: 600;
-    letter-spacing: 0.01em;
   }
 
   .tag {
     font-size: var(--text-xs);
     color: var(--bar-muted);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
   }
 
   nav {
     display: flex;
-    gap: var(--space-2);
-    overflow-x: auto;
-    scrollbar-width: none;
+    gap: var(--space-3);
   }
 
   nav a,
-  .ext {
+  .author {
     color: var(--bar-muted);
     text-decoration: none;
     font-size: var(--text-sm);
-    padding: 0.7rem 0 0.6rem;
-    border-bottom: 2px solid transparent;
     white-space: nowrap;
   }
 
+  nav a {
+    padding: 0.75rem 0 0.65rem;
+    border-bottom: 2px solid transparent;
+  }
+
   nav a:hover,
-  .ext:hover {
+  .author:hover,
+  .icon:hover {
     color: var(--bar-ink);
   }
 
@@ -118,29 +143,60 @@
     gap: var(--space-2);
   }
 
-  .notice {
-    margin: 0;
-    max-width: none;
-    padding: 0.3rem var(--gutter);
-    font-size: var(--text-xs);
-    color: var(--muted);
-    border-bottom: 1px solid var(--rule);
-    background: var(--bg-sunk);
+  .icon {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    color: var(--bar-muted);
   }
 
-  /* Phones: brand and theme toggle on the first row, all five pages on the second. */
-  @media (max-width: 760px) {
+  main.workspace {
+    height: calc(100dvh - var(--bar-height));
+  }
+
+  .foot {
+    border-top: 1px solid var(--rule);
+    margin-top: var(--space-5);
+  }
+
+  .foot-inner {
+    max-width: var(--page);
+    margin: 0 auto;
+    padding: var(--space-3) var(--gutter) var(--space-4);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-4);
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  .foot-inner p {
+    margin: 0;
+    max-width: 44rem;
+  }
+
+  .foot-links {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  /* Narrow windows: brand and tools on the first row, the five pages on the second. */
+  @media (max-width: 900px) {
     .bar {
       flex-wrap: wrap;
       height: auto;
       column-gap: var(--space-2);
-      padding-top: 0.45rem;
+      padding-top: 0.4rem;
     }
 
     nav {
       order: 3;
       width: 100%;
-      gap: 0.9rem;
+      gap: 1rem;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
 
     nav a {
@@ -148,8 +204,12 @@
     }
 
     .tag,
-    .ext {
+    .author {
       display: none;
+    }
+
+    main.workspace {
+      height: auto;
     }
   }
 </style>

@@ -8,6 +8,7 @@ import { readNifti } from './nifti';
 import { canonical } from './orientation';
 import { resizeToGrid } from './resample';
 import { applyWindows } from './window';
+import { bodyMask } from './body';
 import { GRID_SHAPE, gridAffine } from './grid';
 
 export type PrepRequest = {
@@ -25,6 +26,8 @@ export interface PrepResult {
   gridHu: Float32Array;
   /** World affine of the model grid stored as NIfTI (i, j, k) = (W, H, D). */
   gridAffine: Mat4;
+  /** (128, 256, 256) body mask on the model grid, for display only (see body.ts). */
+  body: Uint8Array;
   native: {
     shape: [number, number, number];
     zooms: [number, number, number];
@@ -73,6 +76,7 @@ async function prepare(req: PrepRequest): Promise<PrepResult> {
       input,
       gridHu,
       gridAffine: vol.affine,
+      body: bodyMask(gridHu, GRID_SHAPE),
       native: null,
       stats: { ...huStats(gridHu), extentMm: null },
       timings
@@ -95,6 +99,7 @@ async function prepare(req: PrepRequest): Promise<PrepResult> {
     input,
     gridHu,
     gridAffine: gridAffine(can.affine, can.shape),
+    body: bodyMask(gridHu, GRID_SHAPE),
     native: { shape: vol.shape, zooms: vol.zooms, affine: vol.affine, datatype: vol.datatype },
     stats: { ...huStats(vol.data), extentMm },
     timings
@@ -106,7 +111,8 @@ self.onmessage = (event: MessageEvent<PrepRequest>) => {
     .then((r) =>
       (self as unknown as DedicatedWorkerGlobalScope).postMessage(r, [
         r.input.buffer,
-        r.gridHu.buffer
+        r.gridHu.buffer,
+        r.body.buffer
       ])
     )
     .catch((err: unknown) =>

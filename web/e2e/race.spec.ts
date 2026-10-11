@@ -13,9 +13,9 @@ test('benchmark and race on one thread', async ({ page }) => {
   console.log('benchmark\n' + rows.map((r) => r.replace(/\s+/g, ' ')).join('\n'));
   expect(rows.length).toBeGreaterThanOrEqual(9);
 
-  await page.getByLabel('Challenger').selectOption('t2');
+  await page.getByLabel('Second student').selectOption('t2');
   await page.getByRole('button', { name: 'Start the race' }).click();
-  const verdict = page.getByText(/In the time Pillar-0 would need for one scan/);
+  const verdict = page.getByText(/that Pillar-0 would need for one scan on this computer/);
   await expect(verdict).toBeVisible({ timeout: 200_000 });
   console.log((await verdict.innerText()).replace(/\s+/g, ' '));
   await page.getByRole('button', { name: 'Stop' }).click();

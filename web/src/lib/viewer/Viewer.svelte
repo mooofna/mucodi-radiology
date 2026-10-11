@@ -12,11 +12,23 @@
   }
 
   export type Layout = 'grid' | 'axial' | 'coronal' | 'sagittal' | 'render';
+
+  /** Body mask on the model grid (see volume/body.ts) used to show the scan without its surroundings. */
+  export interface DisplayMask {
+    key: string;
+    mask: Uint8Array;
+    /** World affine of the grid stored as (W, H, D). */
+    affine: Mat4;
+    shape: [number, number, number];
+  }
+
+  import type { Mat4 } from '#lib/volume/affine.ts';
 </script>
 
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import type { Niivue, NVImage } from '@niivue/niivue';
+  import { invert, matmul } from '#lib/volume/affine.ts';
 
   type ColorMap = Parameters<Niivue['addColormap']>[1];
 
@@ -28,6 +40,8 @@
     transfer?: string | null;
     layout?: Layout;
     nearest?: boolean;
+    /** Shows air (-1024 HU) outside the body mask and below -1024 HU. Display only. */
+    displayMask?: DisplayMask | null;
     label?: string;
     onLocation?: (
       mm: [number, number, number],
@@ -43,6 +57,7 @@
     transfer = null,
     layout = 'grid',
     nearest = false,
+    displayMask = null,
     label = 'CT viewer',
     onLocation
   }: Props = $props();
@@ -52,6 +67,7 @@
   let mod: typeof import('@niivue/niivue') | null = null;
   let loadedBackground = '';
   let loadedOverlays: string[] = [];
+  let maskedKey = '';
   let status = $state('Loading viewer');
   let busy = 0;
 
@@ -89,7 +105,9 @@
           nv.addVolume(img);
         }
         loadedBackground = bgKey;
+        maskedKey = '';
       }
+      applyDisplayMask();
       if (ovKeys.join('|') !== loadedOverlays.join('|') && nv.volumes.length > 0) {
         for (const v of nv.volumes.slice(1)) nv.removeVolume(v);
         for (const o of overlays) {
@@ -141,6 +159,64 @@
     nv.updateGLVolume();
   }
 
+  // Scanners pad the corners outside the reconstruction circle with values far below air, which
+  // shows as a black disc; the table and cables sit next to the patient. For display, everything
+  // outside the body mask and everything below -1024 HU is set to air. The data the model reads is
+  // unaffected: preprocessing runs on its own copy in a worker.
+  function applyDisplayMask() {
+    const base = nv?.volumes[0];
+    if (!nv || !base || !displayMask) return;
+    const key = `${loadedBackground}|${displayMask.key}`;
+    if (maskedKey === key) return;
+    const hdr = base.hdr as unknown as {
+      dims: number[];
+      affine: number[][];
+      scl_slope: number;
+      scl_inter: number;
+    };
+    const img = base.img as unknown as ArrayLike<number> & { [i: number]: number };
+    if (!img || !hdr?.affine) return;
+    const [nx, ny, nz] = [hdr.dims[1]!, hdr.dims[2]!, Math.max(1, hdr.dims[3]!)];
+    const slope = hdr.scl_slope || 1;
+    const inter = hdr.scl_inter || 0;
+    const air = Math.max(
+      (-1024 - inter) / slope,
+      img instanceof Uint8Array || img instanceof Uint16Array ? 0 : -Infinity
+    );
+    const toGrid = matmul(invert(displayMask.affine), hdr.affine as Mat4);
+    const [D, H, W] = displayMask.shape;
+    const m = displayMask.mask;
+    const col = (c: number) => [toGrid[0]![c]!, toGrid[1]![c]!, toGrid[2]![c]!];
+    const [c0, c1, c2, c3] = [col(0), col(1), col(2), col(3)];
+    let index = 0;
+    for (let k = 0; k < nz; k++)
+      for (let j = 0; j < ny; j++) {
+        // Grid coordinates (w, h, d) of voxel (0, j, k); each step in i adds column 0.
+        let w = c3[0]! + j * c1[0]! + k * c2[0]!;
+        let h = c3[1]! + j * c1[1]! + k * c2[1]!;
+        let d = c3[2]! + j * c1[2]! + k * c2[2]!;
+        for (let i = 0; i < nx; i++, index++) {
+          const wi = Math.round(w);
+          const hi = Math.round(h);
+          const di = Math.round(d);
+          const inside =
+            wi >= 0 &&
+            wi < W &&
+            hi >= 0 &&
+            hi < H &&
+            di >= 0 &&
+            di < D &&
+            m[(di * H + hi) * W + wi] === 1;
+          if (!inside || img[index]! < air) img[index] = air;
+          w += c0[0]!;
+          h += c0[1]!;
+          d += c0[2]!;
+        }
+      }
+    maskedKey = key;
+    nv.updateGLVolume();
+  }
+
   function applyLayout() {
     if (!nv || !mod) return;
     const { SLICE_TYPE } = mod;
@@ -184,6 +260,7 @@
         multiplanarLayout: MULTIPLANAR_TYPE.GRID,
         multiplanarShowRender: SHOW_RENDER.ALWAYS,
         multiplanarPadPixels: 4,
+        multiplanarEqualSize: true,
         isClipAllVolumes: true, // the 3D cut also opens the network-view overlays
         sliceType: SLICE_TYPE.MULTIPLANAR,
         dragAndDropEnabled: false,
@@ -212,6 +289,7 @@
       });
       nv.setClipPlaneColor([0, 0, 0, 0]);
       nv.setRenderAzimuthElevation(150, 15);
+      await nv.setVolumeRenderIllumination(0.4);
       if (import.meta.env.DEV) (window as unknown as { __nv?: Niivue }).__nv = nv;
       applyLayout();
       await sync();
@@ -246,6 +324,11 @@
 
   $effect(() => {
     nv?.setInterpolation(nearest);
+  });
+
+  $effect(() => {
+    void displayMask?.key;
+    applyDisplayMask();
   });
 </script>
 

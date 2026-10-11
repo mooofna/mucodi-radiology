@@ -17,8 +17,9 @@ export type NetRequest =
       key: string;
       taps: { name: string; data: Float32Array }[];
       geometry: TapGeom[];
-      gridHu: Float32Array;
       gridShape: [number, number, number];
+      /** Body mask on the model grid (volume/body.ts); cells outside it are not coloured. */
+      body: Uint8Array;
     }
   | { id: number; type: 'pca'; key: string; tap: string; basisKey?: string }
   | {
@@ -53,44 +54,8 @@ interface Scan {
   taps: Map<string, Float32Array>;
   geometry: Map<string, TapGeom>;
   masks: Map<string, Uint8Array>;
-  gridHu: Float32Array;
   gridShape: [number, number, number];
-  body: Uint8Array | null;
-}
-
-/**
- * Body mask on the model grid: within each axial slice, voxels between the first and last voxel
- * denser than -500 HU along both in-plane directions. This keeps the lungs (inside the chest)
- * and drops the air around the patient.
- */
-function bodyMask(hu: Float32Array, [D, H, W]: [number, number, number]): Uint8Array {
-  const rows = new Uint8Array(D * H * W);
-  const cols = new Uint8Array(D * H * W);
-  for (let d = 0; d < D; d++) {
-    for (let h = 0; h < H; h++) {
-      const base = (d * H + h) * W;
-      let first = -1,
-        last = -1;
-      for (let w = 0; w < W; w++)
-        if (hu[base + w]! > -500) {
-          if (first < 0) first = w;
-          last = w;
-        }
-      for (let w = first; first >= 0 && w <= last; w++) rows[base + w] = 1;
-    }
-    for (let w = 0; w < W; w++) {
-      let first = -1,
-        last = -1;
-      for (let h = 0; h < H; h++)
-        if (hu[(d * H + h) * W + w]! > -500) {
-          if (first < 0) first = h;
-          last = h;
-        }
-      for (let h = first; first >= 0 && h <= last; h++) cols[(d * H + h) * W + w] = 1;
-    }
-  }
-  for (let i = 0; i < rows.length; i++) rows[i] = rows[i]! & cols[i]!;
-  return rows;
+  body: Uint8Array;
 }
 
 const scans = new Map<string, Scan>();
@@ -99,7 +64,6 @@ const scans = new Map<string, Scan>();
 function mask(scan: Scan, g: TapGeom): Uint8Array {
   const hit = scan.masks.get(g.name);
   if (hit) return hit;
-  scan.body ??= bodyMask(scan.gridHu, scan.gridShape);
   const [, D, H, W] = g.shape;
   const [GD, GH, GW] = scan.gridShape;
   const out = new Uint8Array(D * H * W);
@@ -130,9 +94,8 @@ function handle(msg: NetRequest): [NetResponse, Transferable[]] {
         taps: new Map(msg.taps.map((t) => [t.name, t.data])),
         geometry: new Map(msg.geometry.map((g) => [g.name, g])),
         masks: new Map(),
-        gridHu: msg.gridHu,
         gridShape: msg.gridShape,
-        body: null
+        body: msg.body
       });
       return [{ id: msg.id, type: 'stored' }, []];
     }

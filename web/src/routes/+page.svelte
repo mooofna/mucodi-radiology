@@ -1,1155 +1,271 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
-  import Viewer, { type Layer, type Layout } from '#lib/viewer/Viewer.svelte';
-  import Ladder, { type Rung } from '#lib/reading/Ladder.svelte';
-  import Pipeline, { type Step } from '#lib/reading/Pipeline.svelte';
-  import EmbeddingStrip from '#lib/reading/EmbeddingStrip.svelte';
-  import { Lane, cosine } from '#lib/inference/engine.ts';
-  import { prepare, type PrepResult } from '#lib/volume/prep.ts';
-  import { WINDOWS } from '#lib/volume/window.ts';
-  import { GRID_NIFTI_DIMS, GRID_SHAPE, gridSpacing } from '#lib/volume/grid.ts';
-  import { writeNifti } from '#lib/volume/niftiWrite.ts';
-  import {
-    assetUrl,
-    loadCases,
-    loadGoldens,
-    loadModels,
-    type CaseAsset,
-    type CasesManifest,
-    type Goldens,
-    type ModelsManifest
-  } from '#lib/data/manifest.ts';
-  import {
-    byLabel,
-    loadInference,
-    loadLadder,
-    type Inference,
-    type LadderRung
-  } from '#lib/data/evidence.ts';
-  import { call as netCall, cellAt, tapAffine, type TapGeom } from '#lib/network/network.ts';
-  import {
-    deviceFactor,
-    formatSeconds,
-    loadMeasurements,
-    project,
-    saveMeasurement,
-    type Measurement
-  } from '#lib/race/projection.ts';
+  import { onMount } from 'svelte';
+  import { asset, resolve } from '$app/paths';
+  import { byLabel, loadInference, type Inference } from '#lib/data/evidence.ts';
+  import { loadTradeoff, type Tradeoff } from '#lib/data/results.ts';
 
-  type Source =
-    | { kind: 'case'; case: CaseAsset; full: boolean }
-    | { kind: 'own'; name: string; buffer: ArrayBuffer; detail: string };
-
-  let models = $state<ModelsManifest | null>(null);
-  let cases = $state<CasesManifest | null>(null);
-  let goldens = $state<Goldens | null>(null);
   let inference = $state<Inference | null>(null);
-  let ladder = $state<LadderRung[]>([]);
-  let loadError = $state('');
-
-  let source = $state<Source | null>(null);
-  let background = $state<Layer | null>(null);
-  let prep = $state<PrepResult | null>(null);
-  let prepSteps = $state<Step[]>([]);
-  let prepError = $state('');
-
-  let rung = $state('tmin');
-  let threadsMode = $state<'one' | 'all'>('one');
-  let isolated = $state(false);
-  let cores = $state(4);
-
-  let runSteps = $state<Step[]>([]);
-  let running = $state(false);
-  let forwardMs = $state<number | null>(null);
-  let embedding = $state<Float32Array | null>(null);
-  let goldenCos = $state<number | null>(null);
-  let runError = $state('');
-  let measurements = $state<Measurement[]>([]);
-  let hiddenRun = $state(false);
-
-  let windowIndex = $state(0);
-  let presetIndex = $state(0);
-  const PRESETS = [
-    { label: 'Lungs and airways', cmap: 'ct_airways' },
-    { label: 'Soft tissue', cmap: 'ct_soft_tissue' },
-    { label: 'Bone', cmap: 'ct_bones' },
-    { label: 'Contrast', cmap: 'ct_w_contrast' }
-  ];
-  let layout = $state<Layout>('grid');
-  let viewMode = $state<'ct' | 'model'>('ct');
-  let dropActive = $state(false);
-
-  let lane: Lane | null = null;
-  const loaded = new Set<string>();
-  let inputKey = '';
-
-  // Network view: stage feature maps of the taps graphs (TMIN, T2, T6, B0).
-  const TAPS_RUNGS = ['tmin', 't2', 't6', 'b0'];
-  const STAGE_LABELS = ['Stem', '1', '2', '3', '4', '5', '6', '7', 'Head'];
-  let netRung = $state('t2');
-  let netKey = $state('');
-  let netGeometry = $state<TapGeom[]>([]);
-  let stageIndex = $state(3);
-  let netMode = $state<'pca' | 'similarity'>('pca');
-  let netOverlay = $state<Layer | null>(null);
-  let netExplained = $state<[number, number, number] | null>(null);
-  let netCell = $state<[number, number, number] | null>(null);
-  let netBest = $state<{ cell: [number, number, number]; value: number } | null>(null);
-  let netBusy = $state('');
-  let netError = $state('');
-  let netOpacity = $state(0.7);
-  let simMin = $state(0.6);
-  let netMm: [number, number, number] | null = null;
-  let blocks = $state(true);
-
-  const win = $derived(WINDOWS[windowIndex]!);
-  const stage = $derived(netGeometry[stageIndex] ?? null);
-  const overlays = $derived<Layer[]>(
-    netOverlay && viewMode === 'ct' ? [{ ...netOverlay, opacity: netOpacity }] : []
-  );
-  const factor = $derived(deviceFactor(measurements));
-  const p0 = $derived(inference ? byLabel(inference, 'Pillar-0') : null);
-  const c1 = $derived(inference ? byLabel(inference, 'Curia-1') : null);
-  const thesisMs = (r: string) =>
-    inference?.records.find((x) => x.rung === r)?.cpu_median_ms ?? null;
-
-  const rungs = $derived<Rung[]>(
-    ladder.map((l) => {
-      const asset = models?.rungs.find((m) => m.rung === l.rung);
-      const bytes = asset ? asset.files.core.reduce((s, f) => s + f.bytes, 0) : null;
-      const big = l.params_m > 13;
-      const lowMemory =
-        typeof navigator !== 'undefined' &&
-        (navigator as { deviceMemory?: number }).deviceMemory !== undefined &&
-        ((navigator as { deviceMemory?: number }).deviceMemory ?? 8) < 8;
-      return {
-        rung: l.rung,
-        label: l.label,
-        params_m: l.params_m,
-        cpu_ms: thesisMs(l.rung),
-        bytes,
-        available: !!asset && !(big && lowMemory),
-        reason: big && lowMemory ? 'Needs more memory than this device reports' : undefined
-      };
-    })
-  );
-
-  const modelLayer = $derived.by<Layer | null>(() => {
-    if (!prep || viewMode !== 'model') return null;
-    // The model-grid HU array is (D, H, W) C order, i.e. a NIfTI with dims (W, H, D).
-    return {
-      key: `model-${source?.kind === 'case' ? source.case.id : 'own'}-${prep.gridHu.length}`,
-      name: 'model-grid.nii',
-      buffer: writeNifti(GRID_NIFTI_DIMS, prep.gridAffine, { kind: 'float32', data: prep.gridHu })
-    };
-  });
+  let tradeoff = $state<Tradeoff | null>(null);
 
   onMount(() => {
-    isolated = self.crossOriginIsolated;
-    cores = Math.max(1, Math.min(navigator.hardwareConcurrency || 4, 8));
-    measurements = loadMeasurements();
-    try {
-      if (localStorage.getItem('mucodi-threads') === 'all' && isolated) threadsMode = 'all';
-    } catch {
-      // ignore
-    }
-    Promise.all([loadModels(), loadCases(), loadGoldens(), loadInference(), loadLadder()])
-      .then(([m, c, g, i, l]) => {
-        models = m;
-        cases = c;
-        goldens = g;
-        inference = i;
-        ladder = l;
-        const first = c.cases.find((x) => x.hero) ?? c.cases[0];
-        if (first) selectCase(first, false);
-      })
-      .catch((e: unknown) => (loadError = e instanceof Error ? e.message : String(e)));
+    loadInference()
+      .then((i) => (inference = i))
+      .catch(() => undefined);
+    loadTradeoff()
+      .then((t) => (tradeoff = t))
+      .catch(() => undefined);
   });
 
-  onDestroy(() => lane?.terminate()); // lane only exists in the browser
+  const tmin = $derived(inference ? byLabel(inference, 'TMIN') : null);
+  const p0 = $derived(inference ? byLabel(inference, 'Pillar-0') : null);
+  const mlp = (label: string) => tradeoff?.probes.mlp.find((r) => r.label === label)?.avg_ext;
+  const seconds = (ms: number | null | undefined) => (ms ? (ms / 1000).toFixed(2) : '');
 
-  function resetRun() {
-    forwardMs = null;
-    embedding = null;
-    goldenCos = null;
-    runError = '';
-    runSteps = [];
-  }
-
-  async function fetchBuffer(url: string): Promise<ArrayBuffer> {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`could not load ${url} (${r.status})`);
-    return r.arrayBuffer();
-  }
-
-  async function selectCase(c: CaseAsset, full: boolean) {
-    source = { kind: 'case', case: c, full };
-    background = {
-      key: `view-${c.id}`,
-      name: c.files.view,
-      url: assetUrl(`cases/${c.files.view}`)
-    };
-    await runPrep(async () => {
-      const file = full && c.files.full ? c.files.full : c.files.grid;
-      return {
-        kind: full && c.files.full ? 'native' : 'grid',
-        buffer: await fetchBuffer(assetUrl(`cases/${file}`)),
-        name: file
-      };
-    });
-  }
-
-  function resetNetwork() {
-    netKey = '';
-    netOverlay = null;
-    netExplained = null;
-    netCell = null;
-    netBest = null;
-    netError = '';
-  }
-
-  async function runPrep(
-    get: () => Promise<{ kind: 'grid' | 'native'; buffer: ArrayBuffer; name: string }>
-  ) {
-    prep = null;
-    resetNetwork();
-    prepError = '';
-    resetRun();
-    inputKey = '';
-    const t0 = performance.now();
-    prepSteps = [{ name: 'Download', ms: null, state: 'running' }];
-    try {
-      const { kind, buffer, name } = await get();
-      prepSteps = [{ name: 'Download', ms: performance.now() - t0, state: 'done' }];
-      const result = await prepare(kind, buffer, name);
-      prepSteps = [
-        ...prepSteps,
-        ...result.timings.map((t) => ({ name: t.name, ms: t.ms, state: 'done' as const }))
-      ];
-      prep = result;
-    } catch (e) {
-      prepError = e instanceof Error ? e.message : String(e);
+  const PAGES = [
+    {
+      href: resolve('/reading-room'),
+      title: 'Reading room',
+      text: 'View one of three public chest CTs or your own scan, encode it with any of the fourteen students, and look at the feature maps of each network stage.'
+    },
+    {
+      href: resolve('/race'),
+      title: 'CPU race',
+      text: 'Two students run side by side on this computer, next to the projected times of the teachers. A benchmark measures every student on its own.'
+    },
+    {
+      href: resolve('/results'),
+      title: 'Results',
+      text: 'External AUROC by model size, cohort and endpoint, transfer to a hospital outside the training data, and inference speed.'
+    },
+    {
+      href: resolve('/method'),
+      title: 'Method',
+      text: 'The distillation step by step, the student models, the preprocessing and the limitations of the study.'
+    },
+    {
+      href: resolve('/about'),
+      title: 'About',
+      text: 'Intended use, privacy, licences, credits and how to cite the thesis.'
     }
-  }
-
-  async function ensureLane(): Promise<Lane> {
-    const threads = threadsMode === 'all' && isolated ? cores : 1;
-    if (lane && lane.threads === threads) return lane;
-    lane?.terminate();
-    loaded.clear();
-    inputKey = '';
-    lane = new Lane(threads);
-    await lane.ready();
-    return lane;
-  }
-
-  async function encode() {
-    if (!prep || !models || running) return;
-    const asset = models.rungs.find((m) => m.rung === rung);
-    if (!asset) return;
-    running = true;
-    resetRun();
-    const steps: Step[] = [
-      { name: 'Load model', ms: null, state: 'running' },
-      { name: 'Copy input', ms: null, state: 'pending' },
-      { name: 'Warm-up', ms: null, state: 'pending' },
-      { name: 'Forward pass', ms: null, state: 'pending' }
-    ];
-    runSteps = steps;
-    const set = (i: number, patch: Partial<Step>) => {
-      runSteps = runSteps.map((s, j) => (j === i ? { ...s, ...patch } : s));
-    };
-    try {
-      const l = await ensureLane();
-      const key = `${rung}.core`;
-      let t = performance.now();
-      if (!loaded.has(key)) {
-        const [main, ...rest] = asset.files.core;
-        await l.load(
-          key,
-          assetUrl(`models/${main!.path}`),
-          rest.map((f) => ({ path: f.path, url: assetUrl(`models/${f.path}`) })),
-          (done, total) => set(0, { note: `${Math.round((100 * done) / (total || 1))} %` })
-        );
-        loaded.add(key);
-      }
-      set(0, { ms: performance.now() - t, state: 'done' });
-      set(1, { state: 'running' });
-      t = performance.now();
-      const caseKey =
-        source?.kind === 'case' ? `${source.case.id}:${source.full}` : `own:${source?.name}`;
-      if (inputKey !== caseKey) {
-        await l.setInput('input', prep.input, [1, 4, ...GRID_SHAPE]);
-        inputKey = caseKey;
-      }
-      set(1, { ms: performance.now() - t, state: 'done' });
-      set(2, { state: 'running' });
-      let wasHidden = document.visibilityState === 'hidden';
-      const watch = () => (wasHidden ||= document.visibilityState === 'hidden');
-      document.addEventListener('visibilitychange', watch);
-      const result = await l
-        .run(key, 'input', { warmup: 0, iters: 2, outputs: ['embedding'] })
-        .finally(() => document.removeEventListener('visibilitychange', watch));
-      hiddenRun = wasHidden;
-      set(2, { ms: result.times[0]!, state: 'done' });
-      set(3, { ms: result.times[1]!, state: 'done' });
-      forwardMs = result.times[1]!;
-      embedding = result.outputs.embedding!.data;
-      if (source?.kind === 'case' && goldens) {
-        const g = goldens.cases[source.case.id]?.[rung];
-        if (g) goldenCos = cosine(embedding, g.embedding);
-      }
-      const th = thesisMs(rung);
-      // Background tabs are throttled by the browser; such timings are shown but not kept.
-      if (l.threads === 1 && th && !hiddenRun)
-        measurements = saveMeasurement({ rung, liveMs: forwardMs, thesisMs: th });
-    } catch (e) {
-      runError = e instanceof Error ? e.message : String(e);
-      runSteps = runSteps.map((s) => (s.state === 'running' ? { ...s, state: 'pending' } : s));
-      lane?.terminate();
-      lane = null;
-    } finally {
-      running = false;
-    }
-  }
-
-  async function computeNetwork() {
-    if (!prep || !models || netBusy) return;
-    const asset = models.rungs.find((m) => m.rung === netRung);
-    if (!asset?.files.taps || !asset.taps) return;
-    netError = '';
-    netBusy = 'Loading the stage maps model';
-    try {
-      const l = await ensureLane();
-      const key = `${netRung}.taps`;
-      if (!loaded.has(key)) {
-        await l.load(key, assetUrl(`models/${asset.files.taps[0]!.path}`));
-        loaded.add(key);
-      }
-      const caseKey =
-        source?.kind === 'case' ? `${source.case.id}:${source.full}` : `own:${source?.name}`;
-      if (inputKey !== caseKey) {
-        await l.setInput('input', prep.input, [1, 4, ...GRID_SHAPE]);
-        inputKey = caseKey;
-      }
-      netBusy = 'Running the network';
-      const names = asset.taps.map((g) => g.name);
-      const t = performance.now();
-      const result = await l.run(key, 'input', { warmup: 0, iters: 1, outputs: names });
-      netBusy = `Analysing ${names.length} stages`;
-      const taps = names.map((n) => ({ name: n, data: result.outputs[n]!.data }));
-      const k = `${caseKey}:${netRung}`;
-      await netCall(
-        {
-          type: 'set',
-          key: k,
-          taps,
-          geometry: $state.snapshot(asset.taps) as TapGeom[],
-          gridHu: prep.gridHu.slice(),
-          gridShape: GRID_SHAPE
-        },
-        taps.map((x) => x.data.buffer)
-      );
-      netGeometry = $state.snapshot(asset.taps) as TapGeom[];
-      netKey = k;
-      netBusy = '';
-      netCell = null;
-      netBest = null;
-      await showStage();
-      netBusy = '';
-      netRunMs = performance.now() - t;
-    } catch (e) {
-      netError = e instanceof Error ? e.message : String(e);
-      netBusy = '';
-    }
-  }
-
-  let netRunMs = $state<number | null>(null);
-
-  async function showStage() {
-    if (!netKey || !stage || !prep) return;
-    const affine = tapAffine(prep.gridAffine, stage);
-    if (netMode === 'pca') {
-      const r = await netCall({ type: 'pca', key: netKey, tap: stage.name });
-      if (r.type !== 'pca') return;
-      netExplained = r.explained;
-      netOverlay = {
-        key: `pca-${netKey}-${stage.name}`,
-        name: `pca-${stage.name}.nii`,
-        buffer: writeNifti(r.dims, affine, { kind: 'rgba', data: r.rgba })
-      };
-    } else if (netCell) {
-      const cell: [number, number, number] = [netCell[0], netCell[1], netCell[2]];
-      const r = await netCall({ type: 'similarity', key: netKey, tap: stage.name, cell });
-      if (r.type !== 'similarity') return;
-      netBest = { cell: r.best, value: r.bestValue };
-      netOverlay = {
-        key: `sim-${netKey}-${stage.name}-${netCell.join('.')}-${simMin}`,
-        name: `similarity-${stage.name}.nii`,
-        buffer: writeNifti(r.dims, affine, { kind: 'float32', data: r.map }),
-        colormap: 'warm',
-        calMin: simMin,
-        calMax: 1
-      };
-    } else {
-      netOverlay = null;
-    }
-  }
-
-  function onLocation(mm: [number, number, number]) {
-    if (!netKey || !stage || !prep || netMode !== 'similarity') return;
-    netMm = mm;
-    const cell = cellAt(prep.gridAffine, stage, mm);
-    if (netCell && cell.every((v, i) => v === netCell![i])) return;
-    netCell = cell;
-    showStage();
-  }
-
-  function setStage(i: number) {
-    stageIndex = i;
-    // Keep pointing at the same place in the scan when switching stages.
-    if (netMode === 'similarity' && netMm && prep && netGeometry[i])
-      netCell = cellAt(prep.gridAffine, netGeometry[i]!, netMm);
-    showStage();
-  }
-
-  function setNetMode(mode: 'pca' | 'similarity') {
-    netMode = mode;
-    showStage();
-  }
-
-  const fmtPct = (v: number) => `${Math.round(v * 100)} %`;
-
-  function setThreads(mode: 'one' | 'all') {
-    if (mode === threadsMode) return;
-    try {
-      localStorage.setItem('mucodi-threads', mode);
-    } catch {
-      // ignore
-    }
-    if (mode === 'all' && !self.crossOriginIsolated) {
-      // Multi-threaded WASM needs cross-origin isolation; the service worker provides it after
-      // one reload (see app.html).
-      location.reload();
-      return;
-    }
-    threadsMode = mode;
-    lane?.terminate();
-    lane = null;
-  }
-
-  // Bring your own scan: NIfTI files are read directly; DICOM folders go through dcm2niix (WASM).
-  async function collectFiles(items: DataTransferItemList): Promise<File[]> {
-    const out: File[] = [];
-    const walk = async (entry: FileSystemEntry, path: string): Promise<void> => {
-      if (entry.isFile) {
-        const file = await new Promise<File>((res, rej) =>
-          (entry as FileSystemFileEntry).file(res, rej)
-        );
-        Object.defineProperty(file, '_webkitRelativePath', { value: path + file.name });
-        out.push(file);
-      } else if (entry.isDirectory) {
-        const reader = (entry as FileSystemDirectoryEntry).createReader();
-        for (;;) {
-          const batch = await new Promise<FileSystemEntry[]>((res, rej) =>
-            reader.readEntries(res, rej)
-          );
-          if (!batch.length) break;
-          for (const e of batch) await walk(e, `${path}${entry.name}/`);
-        }
-      }
-    };
-    const entries = Array.from(items)
-      .map((i) => i.webkitGetAsEntry())
-      .filter((e): e is FileSystemEntry => !!e);
-    for (const e of entries) await walk(e, '');
-    return out;
-  }
-
-  async function openOwn(files: File[]) {
-    if (!files.length) return;
-    const nifti = files.find((f) => /\.nii(\.gz)?$/i.test(f.name));
-    await runPrep(async () => {
-      let file: File;
-      let detail: string;
-      if (nifti) {
-        file = nifti;
-        detail = 'NIfTI';
-      } else {
-        prepSteps = [{ name: 'DICOM to NIfTI', ms: null, state: 'running' }];
-        const { Dcm2niix } = await import('@niivue/dcm2niix');
-        const d = new Dcm2niix();
-        await d.init();
-        const out = (await d.input(files).run()) as File[];
-        const volumes = out
-          .filter((f) => /\.nii(\.gz)?$/i.test(f.name))
-          .sort((a, b) => b.size - a.size);
-        if (!volumes.length) throw new Error('no CT series could be converted from these files');
-        file = volumes[0]!;
-        detail = `DICOM, ${volumes.length} series found, largest used`;
-      }
-      const buffer = await file.arrayBuffer();
-      source = { kind: 'own', name: file.name, buffer, detail };
-      background = {
-        key: `own-${file.name}-${file.size}`,
-        name: file.name,
-        buffer: buffer.slice(0)
-      };
-      return { kind: 'native', buffer: buffer.slice(0), name: file.name };
-    });
-  }
-
-  async function onDrop(event: DragEvent) {
-    event.preventDefault();
-    dropActive = false;
-    if (!event.dataTransfer) return;
-    await openOwn(await collectFiles(event.dataTransfer.items));
-  }
-
-  function heroToggle(full: boolean) {
-    if (source?.kind === 'case') selectCase(source.case, full);
-  }
-
-  function onPick(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    openOwn(Array.from(input.files ?? []));
-    input.value = '';
-  }
-
-  const gridMm = $derived(prep ? gridSpacing(prep.gridAffine) : null);
-  const projected = $derived(
-    factor && p0?.cpu_median_ms && c1?.cpu_median_ms
-      ? { p0: project(p0.cpu_median_ms, factor), c1: project(c1.cpu_median_ms, factor) }
-      : null
-  );
+  ];
 </script>
 
 <svelte:head>
-  <title>Reading room, MuCoDi Chest CT</title>
+  <title>MuCoDi Chest CT</title>
 </svelte:head>
 
-<div
-  class="room"
-  ondragover={(e) => {
-    e.preventDefault();
-    dropActive = true;
-  }}
-  ondragleave={() => (dropActive = false)}
-  ondrop={onDrop}
-  role="presentation"
->
-  <h1 class="visually-hidden">Reading room: encode a chest CT on this CPU</h1>
-  <aside class="worklist" aria-label="Worklist">
-    <h2 class="label">Worklist</h2>
-    {#if loadError}<p class="error">{loadError}</p>{/if}
-    <ul>
-      {#each cases?.cases ?? [] as c (c.id)}
-        <li>
-          <button
-            class="case"
-            class:active={source?.kind === 'case' && source.case.id === c.id}
-            onclick={() => selectCase(c, false)}
-          >
-            <span class="cid mono">{c.patient}</span>
-            <span class="ctitle">{c.title}</span>
-            <span class="cmeta mono"
-              >{c.native_shape_xyz.join(' x ')}, {c.spacing_mm[2]} mm slices</span
-            >
-          </button>
-        </li>
-      {/each}
-    </ul>
-    <div class="own" class:drop={dropActive}>
-      <h2 class="label">Your own scan</h2>
-      <p class="muted small">
-        Drop a NIfTI file or a DICOM folder here. It is processed in this tab and never uploaded.
+<div class="page">
+  <section class="hero">
+    <div class="hero-text">
+      <h1>MuCoDi Chest CT</h1>
+      <p class="lede">
+        Fourteen compact 3D encoders for chest CT, distilled from the radiology foundation models
+        <span class="nb">Pillar-0</span> and <span class="nb">Curia-1</span> in a bachelor thesis at TU
+        Dresden. This site runs them in the browser, on the CPU of the computer you are using.
       </p>
-      <label class="pick">
-        <input type="file" accept=".nii,.gz,.dcm,application/dicom" multiple onchange={onPick} />
-        <span>Choose files</span>
-      </label>
-      <label class="pick">
-        <input type="file" webkitdirectory onchange={onPick} />
-        <span>Choose a DICOM folder</span>
-      </label>
-    </div>
-    {#if prep}
-      <div class="check">
-        <h2 class="label">Input check</h2>
-        <dl>
-          {#if source?.kind === 'case'}
-            <dt>Source</dt>
-            <dd>{source.case.collection}, {source.case.licence}</dd>
-            <dt>Native</dt>
-            <dd class="mono">{source.case.native_shape_xyz.join(' x ')}</dd>
-            <dt>Spacing</dt>
-            <dd class="mono">{source.case.spacing_mm.map((v) => v.toFixed(2)).join(' x ')} mm</dd>
-            <dt>Extent</dt>
-            <dd class="mono">{source.case.extent_mm.map((v) => Math.round(v)).join(' x ')} mm</dd>
-          {:else if source?.kind === 'own' && prep.native}
-            <dt>Source</dt>
-            <dd>{source.detail}</dd>
-            <dt>Native</dt>
-            <dd class="mono">{prep.native.shape.join(' x ')} {prep.native.datatype}</dd>
-            <dt>Spacing</dt>
-            <dd class="mono">{prep.native.zooms.map((v) => v.toFixed(2)).join(' x ')} mm</dd>
-            <dt>Extent</dt>
-            <dd class="mono">{prep.stats.extentMm?.map((v) => Math.round(v)).join(' x ')} mm</dd>
-            <dt>HU range</dt>
-            <dd class="mono">{Math.round(prep.stats.minHu)} to {Math.round(prep.stats.maxHu)}</dd>
-          {/if}
-          <dt>Model grid</dt>
-          <dd class="mono">{GRID_SHAPE.join(' x ')} (D x H x W)</dd>
-          {#if gridMm}<dt>Grid voxel</dt>
-            <dd class="mono">{gridMm.map((v) => v.toFixed(2)).join(' x ')} mm</dd>{/if}
-        </dl>
-        {#if source?.kind === 'own' && prep.stats.extentMm && prep.stats.extentMm[2] > 450}
-          <p class="warn small">
-            The scan covers more than the thorax. The students were trained on chest CT, so this
-            embedding is outside their training distribution.
-          </p>
-        {/if}
-        {#if source?.kind === 'case' && source.case.hero}
-          <label class="toggle small">
-            <input
-              type="checkbox"
-              checked={source.full}
-              onchange={(e) => heroToggle((e.currentTarget as HTMLInputElement).checked)}
-            />
-            Run the full preprocessing in this tab (34 MB native scan)
-          </label>
-        {/if}
-      </div>
-    {/if}
-  </aside>
 
-  <section class="viewer-col" aria-label="Viewer">
-    <div class="toolbar">
-      {#if layout === 'render'}
-        <div class="group" role="group" aria-label="3D preset">
-          {#each PRESETS as p, i (p.cmap)}
-            <button class:on={presetIndex === i} onclick={() => (presetIndex = i)}>{p.label}</button
-            >
-          {/each}
+      <dl class="stats">
+        <div>
+          <dt>TMIN, 36 k parameters</dt>
+          <dd class="num">{seconds(tmin?.cpu_median_ms) || '0.87'}&nbsp;s</dd>
         </div>
-      {:else}
-        <div class="group" role="group" aria-label="Window">
-          {#each WINDOWS as w, i (w.name)}
-            <button class:on={windowIndex === i} onclick={() => (windowIndex = i)}>{w.label}</button
-            >
-          {/each}
+        <div>
+          <dt><span class="nb">Pillar-0</span>, 79 M parameters</dt>
+          <dd class="num">{seconds(p0?.cpu_median_ms) || '71.75'}&nbsp;s</dd>
         </div>
-      {/if}
-      <div class="group" role="group" aria-label="Layout">
-        <button class:on={layout === 'grid'} onclick={() => (layout = 'grid')}>2 x 2</button>
-        <button class:on={layout === 'axial'} onclick={() => (layout = 'axial')}>Axial</button>
-        <button class:on={layout === 'coronal'} onclick={() => (layout = 'coronal')}>Coronal</button
+        <div>
+          <dt>Speed-up of TMIN</dt>
+          <dd class="num">{tmin?.cpu_speedup_vs_pillar0?.toFixed(1) ?? '82.6'}&thinsp;×</dd>
+        </div>
+      </dl>
+      <p class="hint">
+        Time to encode one chest CT on one thread of an Intel Xeon Silver 4214R, thesis Table 6.5.
+      </p>
+
+      <div class="actions">
+        <a class="button primary" href={`${resolve('/reading-room')}?encode=1`}
+          >Encode a scan on this computer</a
         >
-        <button class:on={layout === 'render'} onclick={() => (layout = 'render')}>3D</button>
+        <a class="button" href={resolve('/race')}>Start the CPU race</a>
       </div>
-      <div class="group" role="group" aria-label="Image">
-        <button class:on={viewMode === 'ct'} onclick={() => (viewMode = 'ct')}>Scan</button>
-        <button
-          class:on={viewMode === 'model'}
-          disabled={!prep}
-          onclick={() => (viewMode = 'model')}>Model input</button
-        >
-      </div>
+      <p class="hint">
+        Research demo. Not a medical device and not for diagnosis. Scans you open are processed in
+        your browser and never uploaded.
+      </p>
     </div>
-    <div class="canvas">
-      <Viewer
-        background={viewMode === 'model' ? modelLayer : background}
-        {overlays}
-        window={{ center: win.center, width: win.width }}
-        transfer={layout === 'render' ? PRESETS[presetIndex]!.cmap : null}
-        nearest={!!netOverlay && blocks}
-        {layout}
-        {onLocation}
-        label="Chest CT, multiplanar and 3D"
+
+    <figure class="hero-image">
+      <img
+        src={asset('images/reading-room.jpg')}
+        alt="The reading room: coronal, sagittal and axial slices of a chest CT in the lung window, and a 3D view cut along the coronal plane that shows the ribs and the vessels of the lungs."
+        width="1000"
+        height="983"
       />
-    </div>
-    <div class="status mono">
-      <span
-        >{#if source?.kind === 'case'}{source.case.patient}, {source.case
-            .collection}{:else if source?.kind === 'own'}{source.name}, local file{/if}</span
-      >
-      <span>{viewMode === 'model' ? 'Model input grid 128 x 256 x 256' : 'Native scan'}</span>
-      <span
-        >{layout === 'render'
-          ? `3D ${PRESETS[presetIndex]!.label}`
-          : `${win.label} W ${win.width} L ${win.center}`}</span
-      >
-      <span class="nd">Not for diagnosis</span>
-    </div>
+      <figcaption class="hint">
+        The reading room with <span class="nb">LIDC-IDRI-0001</span> (CC BY 3.0).
+      </figcaption>
+    </figure>
   </section>
 
-  <aside class="analysis" aria-label="Analysis">
-    <section>
-      <h2 class="label">Student encoder</h2>
-      {#if rungs.length}<Ladder
-          {rungs}
-          selected={rung}
-          onSelect={(r) => {
-            rung = r;
-            resetRun();
-          }}
-        />{/if}
-    </section>
-    <section>
-      <div class="threads" role="group" aria-label="CPU threads">
-        <button class:on={threadsMode === 'one'} onclick={() => setThreads('one')}
-          >1 thread (as in the thesis)</button
-        >
-        <button class:on={threadsMode === 'all'} onclick={() => setThreads('all')}
-          >{cores} threads</button
-        >
+  {#if tradeoff}
+    <section class="section">
+      <div class="section-label">
+        <p class="label">Accuracy</p>
+        <h2>Performance on external cohorts</h2>
       </div>
-      <button class="primary encode" disabled={!prep || running} onclick={encode}>
-        {running ? 'Encoding' : 'Encode on this CPU'}
-      </button>
-      {#if prepError}<p class="error">{prepError}</p>{/if}
-      {#if runError}<p class="error">{runError}</p>{/if}
-    </section>
-    <section class="clock-block" aria-live="polite">
-      <p class="label">Forward pass on this device</p>
-      <p class="clock num">
-        {forwardMs !== null ? (forwardMs / 1000).toFixed(2) : '0.00'}<span class="unit"> s</span>
-      </p>
-      {#if hiddenRun}<p class="warn small">
-          This tab was in the background, which browsers slow down. Keep it in front for a
-          comparable time.
-        </p>{/if}
-      {#if forwardMs !== null && projected && p0 && c1}
-        <table class="compare">
-          <tbody>
-            <tr
-              ><td>{rungs.find((r) => r.rung === rung)?.label}, this device</td><td class="num"
-                >{formatSeconds(forwardMs)}</td
-              ></tr
-            >
-            <tr class="proj"
-              ><td>Pillar-0, projected</td><td class="num">{formatSeconds(projected.p0.ms)}</td></tr
-            >
-            <tr class="proj"
-              ><td>Curia-1, projected</td><td class="num">{formatSeconds(projected.c1.ms)}</td></tr
-            >
-          </tbody>
-        </table>
-        <p class="muted small">
-          Teachers are not run here. Their single-thread time from thesis Table 6.5 (Pillar-0 {formatSeconds(
-            p0.cpu_median_ms ?? 0
-          )}, Curia-1 {formatSeconds(c1.cpu_median_ms ?? 0)}) is scaled by this device's speed on {factor?.n ??
-            0} measured student{factor?.n === 1 ? '' : 's'}. <a href="race">Race them</a>.
+      <div class="section-body">
+        <p>
+          With an MLP probe, the student T2, with 0.27 M parameters, reaches an average external
+          AUROC of {mlp('T2')?.toFixed(1)}&nbsp;% across ten external cohorts, against
+          {mlp('Pillar-0')?.toFixed(1)}&nbsp;% for <span class="nb">Pillar-0</span> with 79 M. How
+          much of the teacher's performance a student keeps depends on the probe that reads its
+          features; the <a href={resolve('/results')}>results</a> show both probes, every cohort and every
+          endpoint.
         </p>
-      {/if}
+      </div>
     </section>
-    <section>
-      <h2 class="label">Pipeline</h2>
-      <Pipeline steps={[...prepSteps, ...runSteps]} />
-    </section>
-    {#if embedding}
-      <section>
-        <h2 class="label">Embedding, {embedding.length} values</h2>
-        <EmbeddingStrip values={embedding} />
-        {#if goldenCos !== null}
-          <p class="small">
-            Matches the thesis pipeline in PyTorch: cosine <span class="num"
-              >{goldenCos.toFixed(6)}</span
-            >
-          </p>
-        {/if}
-        <p class="muted small">
-          This vector is what the model outputs. It is not a finding. In the thesis, probes trained
-          on labelled cohorts read it out; see the evidence.
-        </p>
-      </section>
-    {/if}
-    <section class="network">
-      <h2 class="label">Network view</h2>
-      <p class="muted small">
-        How the network represents this scan, stage by stage, on each stage's own grid. Not an
-        explanation of any prediction.
-      </p>
-      <div class="netrow" role="group" aria-label="Network view model">
-        {#each TAPS_RUNGS as r (r)}
-          <button
-            class:on={netRung === r}
-            disabled={!!netBusy}
-            onclick={() => {
-              netRung = r;
-              resetNetwork();
-            }}>{rungs.find((x) => x.rung === r)?.label ?? r}</button
-          >
+  {/if}
+
+  <section class="section">
+    <div class="section-label">
+      <p class="label">This site</p>
+      <h2>Pages</h2>
+    </div>
+    <div class="section-body">
+      <ul class="pages">
+        {#each PAGES as p (p.href)}
+          <li>
+            <a href={p.href}>{p.title}</a>
+            <p>{p.text}</p>
+          </li>
         {/each}
-        <button class="primary" disabled={!prep || !!netBusy} onclick={computeNetwork}
-          >{netKey ? 'Recompute' : 'Compute stage maps'}</button
-        >
-      </div>
-      {#if netBusy}<p class="small">{netBusy}</p>{/if}
-      {#if netError}<p class="error">{netError}</p>{/if}
-      {#if netKey && stage}
-        <div class="netrow stages" role="group" aria-label="Stage">
-          {#each netGeometry as g, i (g.name)}
-            <button
-              class:on={stageIndex === i}
-              onclick={() => setStage(i)}
-              title={`${g.name}: ${g.shape.slice(1).join(' x ')} cells`}>{STAGE_LABELS[i]}</button
-            >
-          {/each}
-        </div>
-        <p class="small mono stageinfo">
-          {stage.name}: {stage.shape.slice(1).join(' x ')} cells, {stage.shape[0]} channels<br />
-          one cell per {stage.stride[0]} input voxels per axis, local receptive field {stage.rf[0]} voxels
-        </p>
-        <div class="netrow" role="group" aria-label="Overlay">
-          <button class:on={netMode === 'pca'} onclick={() => setNetMode('pca')}
-            >Principal components</button
-          >
-          <button class:on={netMode === 'similarity'} onclick={() => setNetMode('similarity')}
-            >Similarity to a cell</button
-          >
-        </div>
-        {#if netMode === 'pca' && netExplained}
-          <p class="small">
-            Red, green and blue are the first three principal components of the cells inside the
-            body; together they carry
-            <span class="num">{fmtPct(netExplained[0] + netExplained[1] + netExplained[2])}</span>
-            of the variance ({fmtPct(netExplained[0])}, {fmtPct(netExplained[1])}, {fmtPct(
-              netExplained[2]
-            )}).
-          </p>
-        {:else if netMode === 'similarity'}
-          {#if netCell && netBest}
-            <p class="small">
-              Cell <span class="mono">{netCell.join(', ')}</span>: cosine similarity of every cell's
-              feature vector to the clicked cell, shown from
-              <span class="num">{simMin.toFixed(2)}</span> to 1.
-            </p>
-            <label class="small slider"
-              >Show from
-              <input
-                type="range"
-                min="0"
-                max="0.95"
-                step="0.05"
-                bind:value={simMin}
-                onchange={showStage}
-              />
-            </label>
-          {:else}
-            <p class="small">Click a point in the scan to compare every cell with it.</p>
-          {/if}
-        {/if}
-        <label class="small slider"
-          >Opacity
-          <input type="range" min="0.1" max="1" step="0.05" bind:value={netOpacity} />
-        </label>
-        <label class="small toggle"
-          ><input type="checkbox" bind:checked={blocks} /> Show cells as blocks (no smoothing)</label
-        >
-        <p class="muted small">
-          Each stage also receives squeeze-excitation gates pooled over the whole scan, so strictly
-          every cell depends on the whole volume; the receptive field above is the convolutional
-          one.
-        </p>
-      {/if}
-    </section>
-  </aside>
+      </ul>
+    </div>
+  </section>
 </div>
 
 <style>
-  .room {
+  .hero {
     display: grid;
-    grid-template-columns: 17rem minmax(0, 1fr) 23rem;
-    height: calc(100dvh - 44px - 1.6rem);
-    min-height: 560px;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    gap: var(--space-4);
+    align-items: start;
   }
 
-  aside,
-  section.viewer-col {
-    min-height: 0;
+  h1 {
+    font-size: var(--text-display);
+    margin: 0 0 0.8rem;
   }
 
-  .worklist,
-  .analysis {
-    overflow-y: auto;
-    padding: var(--space-2);
-    font-size: var(--text-sm);
+  .lede {
+    font-size: var(--text-lg);
+    max-width: 40rem;
   }
 
-  .worklist {
-    border-right: 1px solid var(--rule);
-  }
-
-  .analysis {
-    border-left: 1px solid var(--rule);
+  .stats {
     display: grid;
-    align-content: start;
-    gap: var(--space-3);
-  }
-
-  ul {
-    list-style: none;
-    margin: 0.4rem 0 var(--space-3);
-    padding: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin: var(--space-3) 0 0.6rem;
     border-top: 1px solid var(--rule-strong);
+    padding-top: var(--space-2);
   }
 
-  .case {
-    display: grid;
-    width: 100%;
-    text-align: left;
-    border: 0;
-    border-bottom: 1px solid var(--rule);
-    padding: 0.5rem 0.4rem;
-    gap: 0.1rem;
+  .stats div {
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: flex-end;
+    gap: 0.2rem;
   }
 
-  .case.active {
-    background: var(--bg-sunk);
-    box-shadow: inset 3px 0 0 var(--accent);
-  }
-
-  .cid {
-    font-size: var(--text-xs);
-  }
-
-  .cmeta {
-    font-size: 0.7rem;
+  .stats dt {
+    font-size: var(--text-sm);
     color: var(--muted);
   }
 
-  .own {
-    border-top: 1px solid var(--rule-strong);
-    padding-top: 0.4rem;
-    margin-bottom: var(--space-3);
+  .stats dd {
+    margin: 0;
+    font-size: var(--text-xl);
+    font-weight: 600;
   }
 
-  .own.drop {
-    outline: 2px dashed var(--accent);
-    outline-offset: 4px;
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+    margin: var(--space-3) 0 var(--space-2);
   }
 
-  .pick {
-    display: block;
-    margin-top: 0.4rem;
-  }
-
-  .pick input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-  }
-
-  .pick span {
+  .button {
     display: inline-block;
     border: 1px solid var(--rule-strong);
-    padding: 0.25rem 0.6rem;
-    cursor: pointer;
-    font-size: var(--text-sm);
+    padding: 0.55rem 1.1rem;
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 500;
   }
 
-  .pick input:focus-visible + span {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+  .button:hover {
+    background: var(--bg-sunk);
   }
 
-  .check {
-    border-top: 1px solid var(--rule-strong);
-    padding-top: 0.4rem;
+  .button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
   }
 
-  dl {
-    display: grid;
-    grid-template-columns: 5.5rem 1fr;
-    gap: 0.15rem 0.5rem;
-    margin: 0.4rem 0;
-    font-size: var(--text-xs);
+  .button.primary:hover {
+    filter: brightness(1.08);
   }
 
-  dt {
-    color: var(--muted);
-  }
-
-  dd {
+  .hero-image {
     margin: 0;
   }
 
-  .small {
-    font-size: var(--text-xs);
-  }
-
-  .warn {
-    color: var(--warn);
-  }
-
-  .error {
-    color: var(--warn);
-    font-size: var(--text-sm);
-  }
-
-  .toggle {
-    display: flex;
-    gap: 0.4rem;
-    align-items: flex-start;
-    margin-top: 0.4rem;
-  }
-
-  .viewer-col {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    background: var(--viewer-bg);
-  }
-
-  .status {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem 1.5rem;
-    padding: 0.3rem 0.6rem;
-    border-top: 1px solid var(--viewer-rule);
-    font-size: 0.7rem;
-    color: var(--viewer-dim);
-  }
-
-  .status .nd {
-    margin-left: auto;
-    color: var(--viewer-ink);
-  }
-
-  .toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    padding: 0.4rem 0.6rem;
-    border-bottom: 1px solid var(--viewer-rule);
-  }
-
-  .group {
-    display: flex;
-  }
-
-  .toolbar button {
-    border-color: var(--viewer-rule);
-    color: var(--viewer-dim);
-    font-size: var(--text-xs);
-    padding: 0.2rem 0.55rem;
-    margin-left: -1px;
-  }
-
-  .toolbar button.on {
-    color: var(--viewer-ink);
-    border-color: var(--viewer-accent);
-    position: relative;
-    z-index: 1;
-  }
-
-  .canvas {
-    position: relative;
-    min-height: 0;
-  }
-
-  .threads {
-    display: flex;
-    margin-bottom: 0.5rem;
-  }
-
-  .netrow {
-    display: flex;
-    flex-wrap: wrap;
-    margin: 0.4rem 0;
-  }
-
-  .netrow button {
-    font-size: var(--text-xs);
-    margin: 0 -1px -1px 0;
-  }
-
-  .netrow button.on {
-    border-color: var(--accent);
-    color: var(--accent);
-    position: relative;
-  }
-
-  .netrow button.primary {
-    margin-left: 0.6rem;
-  }
-
-  .stages button {
-    min-width: 2.2rem;
-  }
-
-  .stageinfo {
-    color: var(--muted);
-  }
-
-  .slider {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0.3rem 0;
-  }
-
-  .slider input {
-    flex: 1;
-    accent-color: var(--accent);
-  }
-
-  .threads button {
-    flex: 1;
-    font-size: var(--text-xs);
-    margin-left: -1px;
-  }
-
-  .threads button.on {
-    border-color: var(--accent);
-    color: var(--accent);
-    position: relative;
-  }
-
-  .encode {
+  .hero-image img {
+    display: block;
     width: 100%;
-    padding: 0.55rem;
+    height: auto;
+    background: #000000;
   }
 
-  .clock-block p {
+  figcaption {
+    margin: 0.5rem 0 0;
+  }
+
+  .pages {
+    list-style: none;
     margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: var(--space-2) var(--space-3);
   }
 
-  .clock {
-    font-size: var(--text-clock);
-    line-height: 1.05;
-    letter-spacing: -0.02em;
+  .pages li {
+    border-top: 1px solid var(--rule);
+    padding-top: 0.6rem;
   }
 
-  .unit {
-    font-size: 0.45em;
+  .pages a {
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .pages a:hover {
+    text-decoration: underline;
+  }
+
+  .pages p {
+    margin: 0.3rem 0 0;
+    font-size: var(--text-sm);
     color: var(--muted);
   }
 
-  .compare {
-    margin: 0.5rem 0;
-  }
-
-  .compare tr.proj td {
-    color: var(--muted);
-  }
-
-  @media (max-width: 1100px) {
-    .room {
+  @media (max-width: 900px) {
+    .hero {
       grid-template-columns: minmax(0, 1fr);
-      height: auto;
-    }
-
-    .viewer-col {
-      order: -1;
-      height: 70dvh;
-    }
-
-    .worklist,
-    .analysis {
-      border: 0;
-      border-top: 1px solid var(--rule);
     }
   }
 </style>

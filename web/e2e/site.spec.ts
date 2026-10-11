@@ -3,7 +3,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-const PAGES = ['/', '/race', '/evidence', '/method', '/about'];
+const PAGES = ['/', '/reading-room', '/race', '/results', '/method', '/about'];
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -42,25 +42,26 @@ for (const path of PAGES) {
   }
 }
 
-test('the evidence page carries the thesis numbers', async ({ page }) => {
+test('the results page carries the thesis numbers', async ({ page }) => {
   // Regular expressions see the raw text, so every gap between words is \s+ (source line breaks).
+  await page.goto('/results');
+  await expect(
+    page.getByText(/T2,\s+with\s+0\.27\s+M\s+parameters,\s+reaches\s+70\.5\s+%/)
+  ).toBeVisible();
+  await expect(page.getByText(/TMIN\s+encodes\s+a\s+scan\s+82\.6\s+times\s+faster/)).toBeVisible();
+  await expect(page.getByText(/TMIN\s+reaches\s+68\.7\s+%\s+on/)).toBeVisible();
+  await expect(page.getByText(/1,296\s+combinations\s+of\s+endpoint/)).toBeVisible();
+});
+
+test('the old evidence address leads to the results', async ({ page }) => {
   await page.goto('/evidence');
-  await expect(page.getByText(/T2\s+reaches\s+70\.5\s+%/)).toBeVisible();
-  await expect(
-    page.getByText(/student\s+is\s+82\.6\s+times\s+faster\s+than\s+Pillar-0/)
-  ).toBeVisible();
-  await expect(
-    page.getByText(/TMIN\s+reaches\s+68\.7\s+against\s+Curia-1's\s+65\.6/)
-  ).toBeVisible();
-  await expect(
-    page.getByText(/1,296\s+endpoint,\s+model\s+and\s+probe\s+combinations/)
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/results\/?$/);
 });
 
 test('the method tour steps through the figure panels', async ({ page }) => {
   await page.goto('/method');
   await page.getByRole('tab', { name: '(d)' }).click();
-  await expect(page.getByRole('heading', { name: /pull to the positive/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The contrastive objective' })).toBeVisible();
   await expect(page.locator('math')).toBeVisible();
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('tab', { name: '(e)' })).toHaveAttribute('aria-selected', 'true');

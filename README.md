@@ -16,10 +16,10 @@ Massachusetts General Hospital. It is a fork of the pathology companion framewor
 
 **[Open the demo](https://mooofna.github.io/mucodi-radiology/)** |
 [Method](https://mooofna.github.io/mucodi-radiology/method) |
-[Evidence](https://mooofna.github.io/mucodi-radiology/evidence) |
+[Results](https://mooofna.github.io/mucodi-radiology/results) |
 [Weights and data](https://github.com/mooofna/mucodi-radiology/releases/tag/demo-assets)
 
-[![The reading room: a TMIN encode on one CPU thread, with the network view of stage 2 in the slices and in a 3D cutaway](docs/assets/reading-room.jpg)](https://mooofna.github.io/mucodi-radiology/)
+[![The reading room: a chest CT in coronal, sagittal, axial and 3D views, and a TMIN encode on one CPU thread](docs/assets/reading-room.jpg)](https://mooofna.github.io/mucodi-radiology/reading-room)
 
 The fourteen students run in the browser, on the visitor's CPU, through ONNX Runtime Web:
 
@@ -31,10 +31,10 @@ The fourteen students run in the browser, on the visitor's CPU, through ONNX Run
 * **CPU race.** TMIN and a larger student run live; Pillar-0 and Curia-1 are projected onto the
   visitor's machine from their single-core times in thesis Table 6.5 through a measured device
   factor. A benchmark reproduces the table's student column on the visitor's CPU.
-* **Evidence.** Every number is rebuilt from the thesis result files and checked against the
+* **Results.** Every number is rebuilt from the thesis result files and checked against the
   thesis tables, with ROC and precision-recall curves for all 81 endpoints.
 
-[![Average external AUROC against encoder parameters for the MLP and linear probes](docs/assets/evidence-tradeoff.png)](https://mooofna.github.io/mucodi-radiology/evidence)
+[![Average external AUROC against encoder parameters for the MLP and linear probes](docs/assets/evidence-tradeoff.png)](https://mooofna.github.io/mucodi-radiology/results)
 
 The browser reproduces the embeddings of the thesis pipeline in PyTorch (the test suite requires
 a cosine of at least 0.9999). It is a research demo, not a medical device. The scans in the

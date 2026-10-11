@@ -53,8 +53,9 @@
     max-width: 100%;
     height: auto;
     overflow: visible;
-    font-family: var(--font-mono);
-    font-size: 11px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
   }
 
   figure :global([aria-label='tip'] path) {

@@ -66,12 +66,12 @@
 
 <div class="page">
   <header class="intro">
-    <p class="label">About</p>
-    <h1>A research demo, built from a bachelor thesis.</h1>
+    <h1>About</h1>
     <p class="lede">
-      MuCoDi Chest CT runs the distilled students of the thesis <i
+      This site accompanies the bachelor thesis <i
         >On the Parameter-Performance Trade-Off of Radiology Foundation Models</i
-      > on your own computer, next to the evidence the thesis rests on.
+      > (TU Dresden, 2026). It runs the distilled students in the browser, on the visitor's own computer,
+      and shows the results they are based on.
     </p>
   </header>
 
@@ -103,7 +103,7 @@
   <section class="section">
     <div class="section-label">
       <p class="label">Privacy</p>
-      <h2>Your scans stay on your device</h2>
+      <h2>Scans stay in the browser</h2>
     </div>
     <div class="section-body">
       <ul class="plain">
@@ -193,8 +193,8 @@
 
   <section class="section">
     <div class="section-label">
-      <p class="label">People</p>
-      <h2>Thesis and credits</h2>
+      <p class="label">Credits</p>
+      <h2>Thesis and acknowledgements</h2>
     </div>
     <div class="section-body">
       <p>
@@ -215,7 +215,8 @@
         MuCoDi was first developed for computational pathology in a companion study: Lenz, Heide,
         Gustav, Reitsam and Kather, <i
           >Multi-Teacher Contrastive Distillation for Edge-Efficient Pathology Foundation Models</i
-        >, arXiv:2607.05533, 2026. The teachers are described in Agrawal et al.,
+        >, arXiv:2607.05533, 2026, which received the Best Paper Award at the MICCAI 2026 Workshop
+        on Efficient Medical AI. The teachers are described in Agrawal et al.,
         <i>Pillar-0: A New Frontier for Radiology Foundation Models</i>, arXiv:2511.17803, 2025, and
         Dancette et al., <i>Curia: A Multi-Modal Foundation Model for Radiology</i>,
         arXiv:2509.06830, 2025.
@@ -226,7 +227,7 @@
   <section class="section">
     <div class="section-label">
       <p class="label">Disclosure</p>
-      <h2>Advisor and teacher</h2>
+      <h2>Supervision and the Pillar-0 teacher</h2>
     </div>
     <div class="section-body">
       <p>

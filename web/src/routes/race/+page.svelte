@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { resolve } from '$app/paths';
   import Plot from '#lib/components/Plot.svelte';
+  import { log10, logScale } from '#lib/components/logAxis.ts';
   import { Lane, median } from '#lib/inference/engine.ts';
   import { prepare } from '#lib/volume/prep.ts';
   import { GRID_SHAPE } from '#lib/volume/grid.ts';
@@ -56,8 +58,11 @@
   const c1Ms = $derived(inference ? (byLabel(inference, 'Curia-1').cpu_median_ms ?? 0) : 0);
   const thesisMs = (r: string) => inference?.records.find((x) => x.rung === r)?.cpu_median_ms ?? 0;
   const label = (r: string) => ladder.find((l) => l.rung === r)?.label ?? r.toUpperCase();
+  /** Thesis timings are quoted as in Table 6.5, to two decimals. */
+  const fmtThesis = (ms: number) => `${(ms / 1000).toFixed(2)} s`;
+  const fmtParams = (p: number) => (p < 1 ? `${(p * 1000).toFixed(0)} k` : `${p} M`);
 
-  /** Isolated single-thread measurements first; during a race, TMIN's first lap is provisional. */
+  /** Isolated single-thread measurements first; during a race, TMIN's first pass is provisional. */
   const factor = $derived.by(() => {
     if (measurements.length) return { f: deviceFactor(measurements)!, provisional: false };
     const tmin = lanes.find((l) => l.rung === 'tmin');
@@ -76,6 +81,18 @@
   const axisMs = $derived(p0 ? p0.ms * 1.08 : 60000);
   const p0Done = $derived(!!p0 && elapsed >= p0.ms);
 
+  const blank = (rung: string): LiveLane => ({
+    rung,
+    label: label(rung),
+    lane: null,
+    state: 'idle',
+    progress: '',
+    completions: [],
+    latencies: []
+  });
+  // Before the first race the board already shows its four lanes.
+  const shown = $derived<LiveLane[]>(lanes.length ? lanes : [blank('tmin'), blank(challenger)]);
+
   onMount(() => {
     measurements = loadMeasurements();
     Promise.all([loadModels(), loadCases(), loadInference(), loadLadder()])
@@ -84,7 +101,7 @@
         inference = i;
         ladder = l;
         const hero = c.cases.find((x) => x.hero) ?? c.cases[0]!;
-        caseLabel = `${hero.patient}, ${hero.collection}`;
+        caseLabel = `${hero.patient} (${hero.collection})`;
         const buffer = await (await fetch(assetUrl(`cases/${hero.files.grid}`))).arrayBuffer();
         input = (await prepare('grid', buffer, hero.files.grid)).input;
       })
@@ -130,16 +147,7 @@
   async function start() {
     if (!input || !models || racing) return;
     stop();
-    const make = (rung: string): LiveLane => ({
-      rung,
-      label: label(rung),
-      lane: null,
-      state: 'idle',
-      progress: '',
-      completions: [],
-      latencies: []
-    });
-    lanes = [make('tmin'), make(challenger)];
+    lanes = [blank('tmin'), blank(challenger)];
     elapsed = 0;
     try {
       await Promise.all(lanes.map((l) => startLane(l)));
@@ -212,7 +220,7 @@
           const r = await lane.run(`${rung}.core`, 'input', { warmup: 1, iters: 5 });
           if (hiddenBefore || document.visibilityState === 'hidden') {
             benchStatus =
-              'Paused: the tab went to the background, which browsers slow down. Bring it to the front and run again.';
+              'Paused because the tab went to the background, which browsers slow down. Bring it to the front and run again.';
             break;
           }
           measurements = saveMeasurement({
@@ -232,53 +240,89 @@
     }
   }
 
+  const order = (r: string) => ladder.findIndex((l) => l.rung === r);
   const benchRows = $derived(
     [...measurements]
-      .sort((a, b) => a.thesisMs - b.thesisMs)
+      .sort((a, b) => order(a.rung) - order(b.rung))
       .map((m) => ({ ...m, label: label(m.rung), ratio: m.liveMs / m.thesisMs }))
   );
 
+  const THESIS = '#9aa7b4';
+  const HERE = 'var(--accent)';
+
   function chart(P: typeof import('@observablehq/plot'), width: number) {
-    if (!benchRows.length || !factor) return null;
-    const f = factor.f.factor;
-    const values = benchRows.flatMap((r) => [r.thesisMs, r.liveMs]).map((v) => v / 1000);
-    const lo = Math.min(...values) / 1.4;
-    const hi = Math.max(...values) * 1.4;
+    if (!benchRows.length) return null;
+    const rows = [
+      ...benchRows.map((r) => ({
+        label: r.label,
+        thesis: r.thesisMs / 1000,
+        here: r.liveMs / 1000
+      })),
+      ...(p0 && c1
+        ? [
+            { label: 'Pillar-0', thesis: p0Ms / 1000, here: p0.ms / 1000 },
+            { label: 'Curia-1', thesis: c1Ms / 1000, here: c1.ms / 1000 }
+          ]
+        : [])
+    ];
+    const values = rows.flatMap((r) => [r.thesis, r.here]);
+    const lo = Math.min(...values) / 1.3;
+    const hi = Math.max(...values) * 1.3;
+    const points = rows.flatMap((r) => [
+      { label: r.label, s: r.thesis, where: 'Thesis CPU' },
+      {
+        label: r.label,
+        s: r.here,
+        where:
+          r.label.startsWith('Pillar') || r.label.startsWith('Curia')
+            ? 'This computer, projected'
+            : 'This computer'
+      }
+    ]);
     return P.plot({
       width,
-      height: Math.min(380, width * 0.7),
-      marginLeft: 52,
-      marginBottom: 40,
-      x: { type: 'log', label: 'Thesis Xeon Silver 4214R, 1 thread (s)', domain: [lo, hi] },
-      y: { type: 'log', label: 'This device, 1 thread (s)', domain: [lo, hi] },
+      height: 26 * rows.length + 70,
+      marginLeft: 72,
+      marginRight: 16,
+      marginBottom: 44,
+      x: {
+        ...logScale('Seconds per scan, one thread', lo, hi),
+        grid: true,
+        labelAnchor: 'center',
+        labelOffset: 36
+      },
+      y: { domain: rows.map((r) => r.label), label: null },
+      color: {
+        domain: ['Thesis CPU', 'This computer', 'This computer, projected'],
+        range: [THESIS, HERE, HERE]
+      },
+      symbol: {
+        domain: ['Thesis CPU', 'This computer', 'This computer, projected'],
+        range: ['circle', 'circle', 'diamond']
+      },
       marks: [
-        P.line(
-          [
-            [lo, lo],
-            [hi, hi]
-          ],
-          { stroke: 'currentColor', strokeOpacity: 0.35, strokeDasharray: '3,3' }
-        ),
-        P.line(
-          [
-            [lo, lo * f],
-            [hi, hi * f]
-          ],
-          { stroke: 'var(--accent)' }
-        ),
-        P.dot(benchRows, {
-          x: (d) => d.thesisMs / 1000,
-          y: (d) => d.liveMs / 1000,
-          fill: 'currentColor',
-          r: 3
+        P.ruleY(rows, {
+          y: 'label',
+          x1: (d) => log10(d.thesis),
+          x2: (d) => log10(d.here),
+          stroke: 'var(--rule)',
+          strokeWidth: 2
         }),
-        P.text(benchRows, {
-          x: (d) => d.thesisMs / 1000,
-          y: (d) => d.liveMs / 1000,
-          text: 'label',
-          dx: 8,
-          textAnchor: 'start'
-        })
+        P.dot(points, {
+          x: (d) => log10(d.s),
+          y: 'label',
+          fill: 'where',
+          symbol: 'where',
+          r: 4.5
+        }),
+        P.tip(
+          points,
+          P.pointer({
+            x: (d) => log10(d.s),
+            y: 'label',
+            title: (d) => `${d.label}, ${d.where.toLowerCase()}: ${formatSeconds(d.s * 1000)}`
+          })
+        )
       ]
     });
   }
@@ -306,49 +350,47 @@
 
 <div class="page">
   <header class="intro">
-    <p class="label">CPU race</p>
-    <h1>One CPU thread. The same scan.</h1>
+    <h1>CPU race</h1>
     <p class="lede">
-      On one thread of the thesis benchmark machine the smallest student encoded a chest CT in
-      <span class="num">{formatSeconds(thesisMs('tmin'))}</span> and Pillar-0 took
-      <span class="num">{formatSeconds(p0Ms)}</span>. Here the students run live on your CPU; the
-      teachers are projected from those measurements, never run.
+      Two students encode the same chest CT on this computer, each on one CPU thread, as often as
+      they can. The teachers are not run. Their lanes advance at the single-thread times measured in
+      the thesis, {fmtThesis(p0Ms)} per scan for Pillar-0 and {fmtThesis(c1Ms)} for Curia-1, scaled to
+      the speed of this computer.
     </p>
   </header>
 
   {#if loadError}<p class="error">{loadError}</p>{/if}
 
-  <section class="controls">
-    <label>
-      <span class="label">Challenger</span>
-      <select bind:value={challenger} disabled={racing}>
-        {#each ladder.filter((l) => l.rung !== 'tmin' && l.params_m < 13) as l (l.rung)}
-          <option value={l.rung}
-            >{l.label}, {l.params_m < 1 ? `${(l.params_m * 1000).toFixed(0)} k` : `${l.params_m} M`} parameters</option
-          >
-        {/each}
-      </select>
-    </label>
-    <p class="muted small">
-      Scan: {caseLabel || 'loading'}. Each student runs in its own worker on one thread.
-    </p>
-    {#if racing}
-      <button onclick={stop}>Stop</button>
-    {:else}
-      <button class="primary" disabled={!input || !models} onclick={start}>Start the race</button>
-    {/if}
-  </section>
+  <section class="race" aria-label="Race">
+    <div class="controls">
+      <label class="field">
+        <span>Second student</span>
+        <select bind:value={challenger} disabled={racing}>
+          {#each ladder.filter((l) => l.rung !== 'tmin' && l.params_m < 13) as l (l.rung)}
+            <option value={l.rung}>{l.label}, {fmtParams(l.params_m)} parameters</option>
+          {/each}
+        </select>
+      </label>
+      {#if racing}
+        <button onclick={stop}>Stop</button>
+      {:else}
+        <button class="primary" disabled={!input || !models} onclick={start}>
+          {lanes.length ? 'Race again' : 'Start the race'}
+        </button>
+      {/if}
+      <p class="hint">TMIN always races. Scan: {caseLabel || 'loading'}.</p>
+    </div>
 
-  <section class="board" aria-label="Race">
-    <p class="clock num" aria-hidden="true">
+    <p class="clock num" class:idle={!racing && !lanes.length} aria-hidden="true">
       {(elapsed / 1000).toFixed(1)}<span class="unit"> s</span>
     </p>
+
     <div class="lanes">
-      {#each lanes as l (l.rung)}
+      {#each shown as l (l.rung)}
         <div class="lane">
           <div class="who">
             <span class="name">{l.label}</span>
-            <span class="tag">live, this device</span>
+            <span class="tag">runs on this computer</span>
           </div>
           <div class="track">
             {#each l.completions as c, i (i)}
@@ -357,133 +399,143 @@
           </div>
           <div class="count num">
             {#if l.state === 'loading'}loading {l.progress}{:else if l.state === 'warming'}warming
-              up{:else if l.state === 'failed'}failed{:else}{l.completions.length} scans{/if}
+              up{:else if l.state === 'failed'}failed{:else if l.state === 'idle'}<span
+                class="muted">ready</span
+              >{:else}{l.completions.length} scans{/if}
           </div>
         </div>
       {/each}
-      {#if lanes.length}
-        {#each [{ name: 'Pillar-0', p: p0 }, { name: 'Curia-1', p: c1 }] as t (t.name)}
-          <div class="lane projected">
-            <div class="who">
-              <span class="name">{t.name}</span>
-              <span class="tag">projected, not run</span>
-            </div>
-            <div class="track">
-              {#if t.p}
-                <svg
-                  class="hatch"
-                  style={`width: ${Math.min(100, (Math.min(elapsed, t.p.ms) / axisMs) * 100)}%`}
-                  aria-hidden="true"
-                >
-                  <rect width="100%" height="100%" fill="url(#hatch)" />
-                </svg>
-                {#if t.p.ms <= axisMs}<span
-                    class="finish"
-                    style={`left: ${(t.p.ms / axisMs) * 100}%`}
-                  ></span>{/if}
-              {/if}
-            </div>
-            <div class="count num">
-              {#if t.p}{elapsed >= t.p.ms
-                  ? '1 scan'
-                  : `${Math.round((100 * elapsed) / t.p.ms)} %`}{:else}waiting{/if}
-            </div>
+      {#each [{ name: 'Pillar-0', p: p0 }, { name: 'Curia-1', p: c1 }] as t (t.name)}
+        <div class="lane projected">
+          <div class="who">
+            <span class="name">{t.name}</span>
+            <span class="tag"
+              >{t.p ? `projected, ${formatSeconds(t.p.ms)} per scan` : 'projected, not run'}</span
+            >
           </div>
-        {/each}
-      {/if}
+          <div class="track">
+            {#if t.p && lanes.length}
+              <svg
+                class="hatch"
+                style={`width: ${Math.min(100, (Math.min(elapsed, t.p.ms) / axisMs) * 100)}%`}
+                aria-hidden="true"
+              >
+                <rect width="100%" height="100%" fill="url(#hatch)" />
+              </svg>
+            {/if}
+            {#if t.p && t.p.ms <= axisMs}<span
+                class="finish"
+                style={`left: ${(t.p.ms / axisMs) * 100}%`}
+              ></span>{/if}
+          </div>
+          <div class="count num">
+            {#if t.p && lanes.length}{elapsed >= t.p.ms
+                ? '1 scan'
+                : `${Math.round((100 * elapsed) / t.p.ms)} %`}{:else}<span class="muted"
+                >{t.p ? 'ready' : 'waiting'}</span
+              >{/if}
+          </div>
+        </div>
+      {/each}
     </div>
 
     {#if hiddenDuring}
-      <p class="warn small">
+      <p class="warn">
         The tab was in the background during this race. Browsers slow background tabs down, so these
-        counts are lower than this device can do.
+        counts are lower than this computer can do.
       </p>
     {/if}
     {#if p0Done && p0 && lanes.length}
       <p class="verdict" aria-live="polite">
-        In the time Pillar-0 would need for one scan on this CPU (about {formatSeconds(p0.ms)}),
+        In the {formatSeconds(p0.ms)} that Pillar-0 would need for one scan on this computer,
         {#each lanes as l, i (l.rung)}{i > 0 ? ' and ' : ''}{l.label} encoded
-          <span class="num">{countAt(l, p0.ms)}</span>{/each}.
+          <span class="num">{countAt(l, p0.ms)}</span> scans{/each}.
       </p>
     {/if}
 
-    {#if factor}
-      <p class="muted small">
-        Projection: thesis single-thread time times this device's factor
-        <span class="num">{factor.f.factor.toFixed(2)}</span>, the ratio of TMIN's time here to its
-        thesis time, so the projected Pillar-0 to TMIN ratio is the thesis's {tmin?.cpu_speedup_vs_pillar0?.toFixed(
-          1
-        )} by construction and your device sets the time scale.{#if factor.f.n > 1}
-          Other students ran at ratios from <span class="num">{factor.f.min.toFixed(2)}</span> to
-          <span class="num">{factor.f.max.toFixed(2)}</span>, which would put Pillar-0 between
-          {formatSeconds(p0Ms * factor.f.min)} and {formatSeconds(p0Ms * factor.f.max)}.{/if}
-        {#if factor.provisional}Provisional: estimated from the first TMIN pass of this race; the
-          benchmark below measures each student alone.{/if}
-        Students racing side by side share memory bandwidth, so their live counts are, if anything, conservative.
+    <details class="more">
+      <summary>How the teacher lanes are projected</summary>
+      <p class="hint">
+        The thesis measured every model on one thread of the same Intel Xeon Silver 4214R (Table
+        6.5). This computer's speed is the ratio of a student's time here to its thesis time{#if factor},
+          currently {factor.f.factor.toFixed(2)}{#if factor.provisional}, from the first TMIN pass
+            of this race{/if}{/if}. The teachers' thesis times are multiplied by the same ratio, so
+        the gap between Pillar-0 and TMIN stays at the {tmin?.cpu_speedup_vs_pillar0?.toFixed(1)} times
+        the thesis measured. The benchmark below measures each student on its own. Students racing side
+        by side share memory bandwidth, so their counts here are lower than they would be alone.
       </p>
-    {/if}
+    </details>
   </section>
 
   <section class="section">
     <div class="section-label">
       <p class="label">Benchmark</p>
-      <h2>Reproduce Table 6.5 on this device</h2>
+      <h2>Benchmark on this computer</h2>
     </div>
     <div class="section-body">
       <p>
-        Each student runs alone in a fresh worker on one thread: one warm-up, then the median of
-        five forward passes on the same scan, as in the thesis. The ratio to the thesis Xeon times
-        is this device's factor.
+        Each student runs alone on one thread: one warm-up pass, then the median of five timed
+        passes on the same scan, as in the thesis. The results set the speed ratio used for the
+        projections.
       </p>
       <div class="benchctl">
         <button class="primary" disabled={!input || benchRunning || racing} onclick={benchmark}>
           {benchRunning ? 'Measuring' : 'Run the benchmark'}
         </button>
-        <label class="small"
+        <label class="hint check"
           ><input type="checkbox" bind:checked={includeLarge} disabled={benchRunning} /> Include B2 to
-          B6 (about 600 MB of models)</label
+          B6 (about 460 MB more to download)</label
         >
-        <span class="muted small">{benchStatus}</span>
       </div>
+      {#if benchStatus}<p class="hint" aria-live="polite">{benchStatus}</p>{/if}
       {#if benchRows.length}
+        <ul class="legend" aria-label="Legend">
+          <li><span class="dot thesis"></span>Thesis CPU, measured</li>
+          <li><span class="dot here"></span>This computer, measured</li>
+          <li><span class="diamond"></span>This computer, projected</li>
+        </ul>
         <Plot
           make={chart}
-          label="Single-thread encode time per student: this device against the thesis Xeon"
+          label="Seconds per scan on one thread: the thesis CPU and this computer"
         />
         <table>
           <thead>
-            <tr
-              ><th>Student</th><th class="num">Thesis Xeon (s)</th><th class="num"
-                >This device (s)</th
-              ><th class="num">Ratio</th></tr
-            >
+            <tr>
+              <th scope="col">Model</th>
+              <th scope="col" class="num">Thesis CPU (s)</th>
+              <th scope="col" class="num">This computer (s)</th>
+              <th scope="col" class="num">Ratio</th>
+            </tr>
           </thead>
           <tbody>
             {#each benchRows as r (r.rung)}
-              <tr
-                ><td>{r.label}</td><td class="num">{(r.thesisMs / 1000).toFixed(2)}</td><td
-                  class="num">{(r.liveMs / 1000).toFixed(2)}</td
-                ><td class="num">{r.ratio.toFixed(2)}</td></tr
-              >
+              <tr>
+                <td>{r.label}</td>
+                <td class="num">{(r.thesisMs / 1000).toFixed(2)}</td>
+                <td class="num">{(r.liveMs / 1000).toFixed(2)}</td>
+                <td class="num">{r.ratio.toFixed(2)}</td>
+              </tr>
             {/each}
             {#if p0 && c1}
-              <tr class="proj"
-                ><td>Pillar-0, projected</td><td class="num">{(p0Ms / 1000).toFixed(2)}</td><td
-                  class="num">{(p0.ms / 1000).toFixed(1)}</td
-                ><td></td></tr
-              >
-              <tr class="proj"
-                ><td>Curia-1, projected</td><td class="num">{(c1Ms / 1000).toFixed(2)}</td><td
-                  class="num">{(c1.ms / 1000).toFixed(1)}</td
-                ><td></td></tr
-              >
+              <tr class="proj">
+                <td>Pillar-0, projected</td>
+                <td class="num">{(p0Ms / 1000).toFixed(2)}</td>
+                <td class="num">{(p0.ms / 1000).toFixed(1)}</td>
+                <td></td>
+              </tr>
+              <tr class="proj">
+                <td>Curia-1, projected</td>
+                <td class="num">{(c1Ms / 1000).toFixed(2)}</td>
+                <td class="num">{(c1.ms / 1000).toFixed(1)}</td>
+                <td></td>
+              </tr>
             {/if}
           </tbody>
         </table>
-        <p class="muted small">
-          Thesis: Intel Xeon Silver 4214R, PyTorch 2.11, fp32, one pinned thread (Table 6.5). Here:
-          ONNX Runtime Web 1.30 (WebAssembly with SIMD), fp32, one thread. Measurements stay in this
-          browser.
+        <p class="hint">
+          Thesis: Intel Xeon Silver 4214R, PyTorch 2.11, 32-bit floats, one pinned thread (Table
+          6.5). Here: ONNX Runtime Web 1.30 (WebAssembly with SIMD), 32-bit floats, one thread. The
+          measurements stay in this browser.
         </p>
       {/if}
     </div>
@@ -491,15 +543,17 @@
 
   {#if tmin}
     <section class="section">
-      <div class="section-label"><p class="label">Context</p></div>
+      <div class="section-label">
+        <p class="label">GPU</p>
+        <h2>On a GPU</h2>
+      </div>
       <div class="section-body">
         <p>
-          On a GPU the gap closes. On an A100 at batch size 1 the smallest student is
-          <span class="num">{tmin.gpu_b1_speedup_vs_pillar0}</span> times faster than Pillar-0,
-          against
-          <span class="num">{tmin.cpu_speedup_vs_pillar0?.toFixed(1)}</span> times on one CPU thread (Table
-          6.5). The thesis reads this as the GPU forward pass being bound by memory bandwidth, so there
-          the parameter cut surfaces as reduced memory rather than lower latency.
+          On one NVIDIA A100 at batch size 1, TMIN is {tmin.gpu_b1_speedup_vs_pillar0} times faster than
+          Pillar-0, against {tmin.cpu_speedup_vs_pillar0?.toFixed(1)} times on one CPU thread (Table 6.5).
+          At this input size the GPU forward pass is limited by memory bandwidth, so on a GPU the smaller
+          model mainly needs less memory. See the
+          <a href={resolve('/results')}>results</a> for all models.
         </p>
       </div>
     </section>
@@ -509,12 +563,18 @@
 <style>
   .intro h1 {
     font-size: var(--text-display);
-    margin: 0.3rem 0 0.8rem;
+    margin: 0 0 0.8rem;
   }
 
   .lede {
     font-size: var(--text-lg);
-    max-width: 46rem;
+    max-width: 48rem;
+  }
+
+  .race {
+    border-top: 1px solid var(--rule-strong);
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
   }
 
   .controls {
@@ -522,43 +582,39 @@
     flex-wrap: wrap;
     align-items: end;
     gap: var(--space-2) var(--space-3);
-    border-top: 1px solid var(--rule-strong);
-    padding-top: var(--space-2);
   }
 
-  .controls label {
-    display: grid;
-    gap: 0.2rem;
-  }
-
-  .controls p {
+  .controls .hint {
     margin: 0;
-  }
-
-  .board {
-    margin-top: var(--space-3);
+    padding-bottom: 0.4rem;
   }
 
   .clock {
-    font-size: clamp(3.2rem, 2rem + 5vw, 6.5rem);
+    font-size: clamp(3rem, 2rem + 4vw, 5.5rem);
+    font-weight: 500;
     line-height: 1;
-    margin: 0 0 var(--space-2);
+    margin: var(--space-3) 0 var(--space-2);
     letter-spacing: -0.03em;
+  }
+
+  .clock.idle {
+    color: var(--muted);
   }
 
   .unit {
     font-size: 0.4em;
+    font-weight: 400;
     color: var(--muted);
   }
 
   .lanes {
     display: grid;
-    border-top: 1px solid var(--rule-strong);
+    border-top: 1px solid var(--rule);
   }
 
   .lane {
     display: grid;
-    grid-template-columns: 11rem minmax(0, 1fr) 7rem;
+    grid-template-columns: 13rem minmax(0, 1fr) 6rem;
     align-items: center;
     gap: var(--space-2);
     padding: 0.7rem 0;
@@ -584,7 +640,7 @@
 
   .track {
     position: relative;
-    height: 26px;
+    height: 24px;
     background: var(--bg-sunk);
   }
 
@@ -601,14 +657,13 @@
     position: absolute;
     top: 3px;
     left: 0;
-    height: 20px;
-    border-right: 1px solid var(--c-pillar0);
+    height: 18px;
   }
 
   .finish {
     position: absolute;
-    top: -4px;
-    bottom: -4px;
+    top: -3px;
+    bottom: -3px;
     border-left: 2px solid var(--c-pillar0);
   }
 
@@ -619,10 +674,18 @@
 
   .verdict {
     font-size: var(--text-lg);
-    margin: var(--space-2) 0;
+    margin: var(--space-3) 0 var(--space-2);
     max-width: 52rem;
     border-left: 3px solid var(--accent);
-    padding-left: 0.8rem;
+    padding-left: 0.9rem;
+  }
+
+  .race details {
+    margin-top: var(--space-2);
+  }
+
+  .race details p {
+    max-width: 48rem;
   }
 
   .benchctl {
@@ -630,15 +693,55 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-1);
   }
 
-  .small {
-    font-size: var(--text-xs);
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
   }
 
   tr.proj td {
     color: var(--muted);
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem var(--space-3);
+    list-style: none;
+    margin: var(--space-2) 0 0;
+    padding: 0;
+    font-size: var(--text-sm);
+    color: var(--muted);
+  }
+
+  .legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+
+  .dot.thesis {
+    background: #9aa7b4;
+  }
+
+  .dot.here {
+    background: var(--accent);
+  }
+
+  .diamond {
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    transform: rotate(45deg);
   }
 
   .error,
@@ -648,7 +751,11 @@
 
   @media (max-width: 760px) {
     .lane {
-      grid-template-columns: 6rem minmax(0, 1fr) 4.5rem;
+      grid-template-columns: 6.5rem minmax(0, 1fr) 4.5rem;
+    }
+
+    .tag {
+      display: none;
     }
   }
 </style>
