@@ -12,6 +12,8 @@ This is the code for the bachelor thesis *On the Parameter-Performance Trade-Off
 Radiology Foundation Models* (TU Dresden), written at Harvard Medical School and
 Massachusetts General Hospital. It is a fork of the pathology companion framework.
 
+**[Read the thesis (PDF)](docs/thesis/Heide_2026_Bachelor_Thesis.pdf)**, graded 1.0.
+
 ## Live demo
 
 **[Open the demo](https://mooofna.github.io/mucodi-radiology/)** |
